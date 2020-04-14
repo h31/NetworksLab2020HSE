@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <iostream>
+#include <algorithm>
 #include "Server.h"
 
 
@@ -35,19 +36,34 @@ void Server::run() {
             std::cerr << "ERROR accepting client" << std::endl;
             continue;
         }
-        std::cout << "A new client accepted" << std::endl;
+        std::cout << "A new client accepted " << newSocketFD << std::endl;
         auto client = std::make_shared<Client>(newSocketFD, this);
+        m_mutex.lock();
         m_clients.push_back(client);
+        m_mutex.unlock();
     }
 }
 
 void Server::newMessage(const Message& message) {
+    m_mutex.lock();
     for (auto& client : m_clients) {
-        client->send(message);
+        client->send(message, client);
     }
+    m_mutex.unlock();
 }
 
 Server::~Server() {
     close(m_sockFD);
+}
+
+void Server::removeClient(const Client* client) {
+    m_mutex.lock();
+    auto it = std::find_if(m_clients.begin(), m_clients.end(),
+                           [&](const std::shared_ptr<Client>& a) { return a.get() == client; });
+    if (it != m_clients.end()) {
+        std::cout << "Remove client " << client->socketFD() << std::endl;
+        m_clients.erase(it);
+    }
+    m_mutex.unlock();
 }
 

@@ -23,14 +23,13 @@ public:
     ThreadPool(const ThreadPool& other) = delete;
 
     ~ThreadPool() {
-        stop();
-    }
-
-    void stop() {
         m_mutex.lock();
         end = true;
         ready.notify_all();
         m_mutex.unlock();
+        for (auto& worker : m_workers) {
+            worker.join();
+        }
     }
 
     void execute(const std::shared_ptr<Runnable>& task) {

@@ -2,7 +2,7 @@
 #define SERVER_H
 
 #include <netdb.h>
-#include <vector>
+#include <list>
 #include "Client.h"
 #include "message.h"
 
@@ -16,10 +16,13 @@ public:
 
     void newMessage(const Message& message);
 
+    void removeClient(const Client* client);
+
 private:
     int m_sockFD;
     sockaddr_in m_serverAddress{};
-    std::vector<std::shared_ptr<Client>> m_clients;
+    std::list<std::shared_ptr<Client>> m_clients;
+    std::mutex m_mutex;
 };
 
 #endif

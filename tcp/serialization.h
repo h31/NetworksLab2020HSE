@@ -15,10 +15,10 @@ std::vector<char> intToArray(T x) {
 }
 
 template<typename T, std::size_t N>
-T intFromArray(char bytes[N]) {
+T intFromArray(const char (& bytes)[N]) {
     T result = 0;
     for (std::size_t i = 0; i < N; ++i) {
-        result |= bytes[N - 1 - i] << (i * 8);
+        result |= uint8_t(bytes[N - 1 - i]) << (i * 8);
     }
     return result;
 }

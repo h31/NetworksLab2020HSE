@@ -16,13 +16,18 @@ public:
 
     ~Client();
 
-    void send(const Message& message);
+    int socketFD() const;
+
+    void send(const Message& message, const std::shared_ptr<Client>& client);
+
+    void shutdown();
 
 private:
     const int m_socketFD = 0;
     Server* m_server;
-    const std::thread m_thread;
+    std::thread m_thread;
     ThreadPool m_pool{1};
+    bool stop = false;
 
     void run();
 };
