@@ -17,4 +17,6 @@ private:
     void read_routine();
 
     void write_routine();
+
+    void stop();
 };

@@ -13,6 +13,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <atomic>
 
 Client::Client(const char* hostname, const char* port, const char* name) : m_name(name) {
     addrinfo hints = {};
@@ -61,7 +62,7 @@ Client::Client(const char* hostname, const char* port, const char* name) : m_nam
 }
 
 Client::~Client() {
-    close(m_socketFD);
+    stop();
 }
 
 void Client::read_routine() {
@@ -86,7 +87,8 @@ void Client::read_routine() {
             }
 
         }
-        std::cerr << "Error while reading from server." << std::endl;
+        std::cout << "<Exit. Please press enter.>" << std::endl;
+        stop();
         return;
     }
 }
@@ -109,6 +111,17 @@ void Client::write_routine() {
             && writeFullBuffer(m_socketFD, input.data(), messageLength) == 0) {
             continue;
         }
-        std::cerr << "Error while writing to server." << std::endl;
+        stop();
+        return;
     }
+}
+
+void Client::stop() {
+    static std::atomic_bool stopped(false);
+    if (stopped) {
+        return;
+    }
+    stopped.store(true);
+    shutdown(m_socketFD, SHUT_RDWR);
+    close(m_socketFD);
 }
