@@ -13,9 +13,11 @@ namespace {
 
         void run() override {
             if (writeFullBuffer(m_socketFD, m_message.data(), m_message.size()) != 0) {
-                std::cerr << "Error while writing to client" << std::endl;
                 if (auto ptr = m_client.lock()) {
-                    ptr->shutdown();
+                    if (!ptr->stopped()) {
+                        std::cerr << "Error while writing to client" << std::endl;
+                        ptr->shutdown();
+                    }
                 }
             }
         }
@@ -37,7 +39,7 @@ void Client::send(const Message& message, const std::shared_ptr<Client>& client)
 void Client::run() {
     char length_buffer[4];
 
-    while (!stop) {
+    while (!m_stop) {
         if (readFullBuffer(m_socketFD, length_buffer, 4) == 0) {
             auto length = intFromArray<uint32_t>(length_buffer);
             Message message(length);
@@ -46,6 +48,9 @@ void Client::run() {
                 continue;
             }
         }
+        if (m_stop) {
+            return;
+        }
         std::cerr << "Error while reading from client." << std::endl;
         shutdown();
         return;
@@ -53,13 +58,14 @@ void Client::run() {
 }
 
 Client::~Client() {
-    stop = true;
+    m_stop = true;
+    ::shutdown(m_socketFD, SHUT_RDWR);
+    close(m_socketFD);
     if (std::this_thread::get_id() != m_thread.get_id()) {
         m_thread.join();
     } else {
         m_thread.detach();
     }
-    close(m_socketFD);
 }
 
 void Client::shutdown() {
@@ -68,4 +74,8 @@ void Client::shutdown() {
 
 int Client::socketFD() const {
     return m_socketFD;
+}
+
+bool Client::stopped() const {
+    return m_stop;
 }

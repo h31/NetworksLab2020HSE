@@ -24,14 +24,18 @@ Server::Server(uint16_t port, int maxClientsNumber) {
     }
 
     listen(m_sockFD, maxClientsNumber);
+    m_thread = std::thread(&Server::run, this);
 }
 
 void Server::run() {
-    while (true) {
+    while (!m_stop) {
         sockaddr_in newAddress{};
         auto* newAddressPtr = reinterpret_cast<sockaddr*>(&newAddress);
         auto addressLength = sizeof(m_serverAddress);
         int newSocketFD = accept(m_sockFD, newAddressPtr, reinterpret_cast<socklen_t*>(&addressLength));
+        if (m_stop) {
+            return;
+        }
         if (newSocketFD < 0) {
             std::cerr << "ERROR accepting client" << std::endl;
             continue;
@@ -53,7 +57,10 @@ void Server::newMessage(const Message& message) {
 }
 
 Server::~Server() {
+    m_stop = true;
+    shutdown(m_sockFD, SHUT_RDWR);
     close(m_sockFD);
+    m_thread.join();
 }
 
 void Server::removeClient(const Client* client) {

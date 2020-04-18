@@ -1,3 +1,4 @@
+#include <iostream>
 #include "Server.h"
 
 int main(int argc, char* argv[]) {
@@ -9,7 +10,14 @@ int main(int argc, char* argv[]) {
     uint16_t port = atoi(argv[1]);
 
     Server server(port);
-    server.run();
+
+    while (true) {
+        std::string command;
+        std::cin >> command;
+        if (command == "exit") {
+            break;
+        }
+    }
 
     return 0;
 }

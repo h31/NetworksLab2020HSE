@@ -12,8 +12,6 @@ public:
 
     ~Server();
 
-    void run();
-
     void newMessage(const Message& message);
 
     void removeClient(const Client* client);
@@ -23,6 +21,10 @@ private:
     sockaddr_in m_serverAddress{};
     std::list<std::shared_ptr<Client>> m_clients;
     std::mutex m_mutex;
+    volatile bool m_stop = false;
+    std::thread m_thread;
+
+    void run();
 };
 
 #endif

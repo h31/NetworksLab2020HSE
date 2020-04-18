@@ -22,12 +22,14 @@ public:
 
     void shutdown();
 
+    bool stopped() const;
+
 private:
     const int m_socketFD = 0;
     Server* m_server;
     std::thread m_thread;
     ThreadPool m_pool{1};
-    bool stop = false;
+    volatile bool m_stop = false;
 
     void run();
 };
