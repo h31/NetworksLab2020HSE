@@ -33,7 +33,7 @@ class ClientConnection;
 
 class Server {
 public:
-    std::shared_mutex chatHistoryMutex = std::shared_mutex();
+    std::shared_mutex chatHistoryMutex;
     static Server buildServer(uint16_t portno, uint32_t clientsN);
     void run();
     void receiveMessage(const Message& message);
@@ -65,7 +65,7 @@ public:
     explicit ClientConnection(int sockfd, uint32_t clientId, Server * server);
     void sendRoutine();
     void run();
-    std::condition_variable_any shouldSendMessage = std::condition_variable_any();
+    std::condition_variable_any shouldSendMessage;
     void shutdown();
     ~ClientConnection();
 
