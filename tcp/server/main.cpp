@@ -33,7 +33,7 @@ class ClientConnection;
 
 class Server {
 public:
-    std::shared_mutex chatHistoryMutex;
+    std::shared_mutex chatHistoryMutex = std::shared_mutex();
     static Server buildServer(uint16_t portno, uint32_t clientsN);
     void run();
     void receiveMessage(const Message& message);
@@ -60,17 +60,17 @@ private:
 
 class ClientConnection {
 public:
-    const uint32_t clientId;
+    const std::atomic_uint32_t clientId;
 
     explicit ClientConnection(int sockfd, uint32_t clientId, Server * server);
     void sendRoutine();
     void run();
-    std::condition_variable_any shouldSendMessage;
+    std::condition_variable_any shouldSendMessage = std::condition_variable_any();
     void shutdown();
     ~ClientConnection();
 
 private:
-    const int sockfd;
+    int sockfd;
     Server * server;
     std::string userName;
     std::atomic_bool isFinished = false;
@@ -129,7 +129,7 @@ void ClientConnection::run() {
         server->notifyClientIsDead(clientId);
         return;
     }
-    std::cout << "User " + userName + " connected\n";
+
     {
         std::thread sendThread([&] { sendRoutine(); });
         while (!isFinished) {
@@ -142,7 +142,6 @@ void ClientConnection::run() {
         }
         sendThread.join();
     }
-    std::cerr << "Client " + std::to_string(clientId) + " " + userName + " disconnected.\n";
     server->notifyClientIsDead(clientId);
 }
 
@@ -340,11 +339,11 @@ void safeShutdownSocket(int socketfd) {
 }
 
 void Server::run() {
+    std::thread dealMessage([&] { messageDealing(); });
     sockaddr_in cli_addr {};
     uint32_t clilen = sizeof(cli_addr);
     uint32_t clientId = 0;
 
-    std::thread dealMessage([&] { messageDealing(); });
     while (true) {
         int newsockfd = accept(sockfd, (sockaddr *) &cli_addr, &clilen);
 
@@ -358,13 +357,13 @@ void Server::run() {
         }
 
         std::unique_lock lock(clientsMutex);
-        auto client = new ClientConnection(newsockfd, clientId++, this);
+        auto client = new ClientConnection(newsockfd, ++clientId, this);
         if (!isFinished) {
             clients.push_back(client);
-            threads.push_back(new std::thread([&] { client->run(); }));
+            threads.push_back(new std::thread(&ClientConnection::run, client));
         } else {
             safeShutdownSocket(newsockfd);
-            close(newsockfd);
+            delete client;
             break;
         }
     }
@@ -412,7 +411,7 @@ int main(int argc, char *argv[]) {
 
     uint16_t portno = atoi(argv[1]);
 
-    Server server = Server::buildServer(portno, 10);
+    Server server = Server::buildServer(portno, 100);
     std::thread serverThread([&] { server.run(); });
     std::string s;
     while (getline(std::cin, s)) {
