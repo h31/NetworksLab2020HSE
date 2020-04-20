@@ -93,6 +93,7 @@ void process_message_buffer(std::deque<uint8_t> &message_buffer, std::string &na
         int op = message_buffer[0];
         if ((!authenticated && op != AUTH_OP) || (authenticated && op != TEXT_OP)) {
             std::cerr << "RECEIVED INCORRECT MESSAGE FROM CLIENT" << std::endl;
+            return;
         }
         if (message_buffer.size() < 3) {
             return;
