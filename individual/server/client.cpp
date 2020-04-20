@@ -4,7 +4,7 @@
 #include "chat.h"
 
 void client::loop() {
-    fprintf(stdout, "Client has started with socket: %d...", socket_fd);
+    fprintf(stdout, "Client has started with socket: %d", socket_fd);
     std::cout << std::endl;
     while (running) {
         unsigned int prefix_size = 4;

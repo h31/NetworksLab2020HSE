@@ -7,6 +7,9 @@ inline bool operator==(std::shared_ptr<client> const& a, client* const b) {
 }
 
 void chat::remove_client(client* client) {
+    fprintf(stdout, "Client was removed");
+    std::cout << std::endl;
+
     if (running) {
         boost::asio::post(chat_thread, [=]() {
             client->shutdown();
