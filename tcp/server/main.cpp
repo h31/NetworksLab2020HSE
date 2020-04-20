@@ -6,25 +6,40 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <string>
 #include <pthread.h>
 #include <vector>
+#include <sstream>
+#include <ctime>
 
 std::vector<pthread_t*> threads_to_join;
 pthread_mutex_t clients_mutex;
 std::vector<int> clients_sockets;
 
-void send_message_to_all_clients(char *message) {
+void send_message_to_all_clients(const char *text_message, const char *username) {
     pthread_mutex_lock(&clients_mutex);
-    for (int client_socket : clients_sockets) {
-        int n = write(client_socket, message, strlen(message));
 
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
+    uint32_t message_length = strlen(text_message);
+    uint32_t username_length = strlen(username);
+    std::stringbuf buf;
+    std::time_t cur_time = std::time(nullptr);
+
+    buf.sputn((char *) &cur_time, sizeof cur_time);
+    buf.sputn((char *) &message_length, sizeof message_length);
+    buf.sputn((char *) &username_length, sizeof username_length);
+    buf.sputn(text_message, message_length);
+    buf.sputn(username, username_length);
+    for (char c : buf.str()) {
+        for (int client_socket : clients_sockets) {
+            int n = write(client_socket, &c, 1);
+            if (n < 0) {
+                perror("ERROR writing to socket");
+                exit(1);
+            }
         }
+        printf("%d\n", (int)c);
     }
     pthread_mutex_unlock(&clients_mutex);
-
 }
 
 void *client_pocess(void* arg) {
@@ -33,16 +48,66 @@ void *client_pocess(void* arg) {
     delete (int*) arg;
     while (true) {
         bzero(buffer, 256);
-        ssize_t n = read(newsockfd, buffer, 255);
+        size_t n = 0;
 
-        if (n < 0) {
-            perror("ERROR reading from socket");
-            exit(1);
+        std::vector<char> v;
+        while (n < sizeof(uint32_t)) {
+            int q = read(newsockfd, buffer, 255);
+            if (q < 0) {
+                perror("ERROR reading from socket");
+                exit(1);
+            }
+            for (int i = 0; i < q; i++) {
+                v.push_back(buffer[i]);
+            }
+            n += q;
         }
+        uint32_t message_length = *((uint32_t*) v.data());
+        printf("Here is the message: %d\n", message_length);
 
-        printf("Here is the message: %s\n", buffer);
+        n -= sizeof(uint32_t);
+        while (n < sizeof(uint32_t)) {
+            int q = read(newsockfd, buffer, 255);
+            if (q < 0) {
+                perror("ERROR reading from socket");
+                exit(1);
+            }
+            for (int i = 0; i < q; i++) {
+                v.push_back(buffer[i]);
+            }
+            n += q;
+        }
+        uint32_t username_length = *((uint32_t*) &v.data()[sizeof(uint32_t)]);
+        printf("Here is the message: %d\n", username_length);
 
-        send_message_to_all_clients(buffer);
+        n -= sizeof(uint32_t);
+
+        std::string message = "";
+        for (int i = 2 * sizeof(uint32_t); i < v.size(); i++) {
+            message += v[i];
+            perror("here");
+
+        }
+        while (n < message_length + username_length) {
+            int q = read(newsockfd, buffer, 255);
+            if (q < 0) {
+                perror("ERROR reading from socket");
+                exit(1);
+            }
+            for (int i = 0; i < q; i++) {
+                message += buffer[i];
+            }
+            n += q;
+            break;
+        }
+         std::string text_message = message.substr(0, message_length);
+         std::string username = message.substr(message_length, username_length);
+         printf("Here is the message: %s\n", text_message.c_str());
+
+         printf("Here is the message: %s\n", username.c_str());
+
+
+         send_message_to_all_clients(text_message.c_str(), username.c_str());
     }
 }
 
@@ -63,10 +128,9 @@ void server_loop(int sockfd) {
     pthread_t *thread = new pthread_t();
     threads_to_join.push_back(thread);
     // TODO process res
-    int res = pthread_create(thread, NULL, client_pocess, (void*) newsockfd);
+    int res = pthread_create(thread, nullptr, client_pocess, (void*) newsockfd);
 
 }
-
 
 
 int main(int argc, char *argv[]) {
@@ -79,7 +143,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (sockfd < 0) {
         perror("ERROR opening socket");
