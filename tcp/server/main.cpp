@@ -11,10 +11,12 @@
 #include <vector>
 #include <sstream>
 #include <ctime>
+#include <atomic>
 
 std::vector<pthread_t*> threads_to_join;
 pthread_mutex_t clients_mutex;
 std::vector<int> clients_sockets;
+std::atomic<bool> stopped;
 
 void send_message_to_all_clients(const char *text_message, const char *username) {
     pthread_mutex_lock(&clients_mutex);
@@ -41,11 +43,14 @@ void send_message_to_all_clients(const char *text_message, const char *username)
     pthread_mutex_unlock(&clients_mutex);
 }
 
-void *client_pocess(void* arg) {
+void *client_process(void* arg) {
     char buffer[256];
     int newsockfd = *(int *)arg;
     delete (int*) arg;
     while (true) {
+        if (stopped.load()) {
+            break;
+        }
         bzero(buffer, 256);
         size_t n = 0;
 
@@ -82,7 +87,6 @@ void *client_pocess(void* arg) {
         std::string message = "";
         for (int i = 2 * sizeof(uint32_t); i < v.size(); i++) {
             message += v[i];
-
         }
         while (n < message_length + username_length) {
             int q = read(newsockfd, buffer, 255);
@@ -95,18 +99,19 @@ void *client_pocess(void* arg) {
             }
             n += q;
         }
-         std::string text_message = message.substr(0, message_length);
-         std::string username = message.substr(message_length, username_length);
-         printf("Here is the message: %s\n", text_message.c_str());
+        std::string text_message = message.substr(0, message_length);
+        std::string username = message.substr(message_length, username_length);
+        printf("Message: %s, from: %s\n", text_message.c_str(), username.c_str());
 
-         printf("Here is the message: %s\n", username.c_str());
-
-
-         send_message_to_all_clients(text_message.c_str(), username.c_str());
+        send_message_to_all_clients(text_message.c_str(), username.c_str());
     }
 }
 
 void server_loop(int sockfd) {
+    if (feof(stdin)) {
+        stopped.store(false);
+        return;
+    }
     sockaddr_in cli_addr;
 
     unsigned int clilen = sizeof(cli_addr);
@@ -122,9 +127,7 @@ void server_loop(int sockfd) {
     pthread_mutex_unlock(&clients_mutex);
     pthread_t *thread = new pthread_t();
     threads_to_join.push_back(thread);
-    // TODO process res
-    int res = pthread_create(thread, nullptr, client_pocess, (void*) newsockfd);
-
+    pthread_create(thread, nullptr, client_process, (void*) newsockfd);
 }
 
 
@@ -132,6 +135,7 @@ int main(int argc, char *argv[]) {
     int sockfd;
     uint16_t portno;
     struct sockaddr_in serv_addr;
+    stopped.store(false);
 
     if (argc < 2) {
         fprintf(stderr, "usage %s port\n", argv[0]);
@@ -147,7 +151,6 @@ int main(int argc, char *argv[]) {
 
     portno = (uint16_t) atoi(argv[1]);
 
-    /* Initialize socket structure */
     bzero((char *) &serv_addr, sizeof(serv_addr));
 
     serv_addr.sin_family = AF_INET;

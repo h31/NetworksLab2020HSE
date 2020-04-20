@@ -12,12 +12,17 @@
 #include <sstream>
 #include <vector>
 #include <ctime>
+#include <atomic>
+
+std::atomic<bool> stopped;
 
 void *read_server_messages(void *arg) {
     char buffer[256];
     int newsockfd = *(int *) arg;
     while (true) {
-
+        if (stopped.load()) {
+            break;
+        }
         bzero(buffer, 256);
         size_t n = 0;
 
@@ -32,7 +37,7 @@ void *read_server_messages(void *arg) {
                 v.push_back(buffer[i]);
             }
             n += q;
-    }
+        }
         time_t time = *((time_t*) v.data());
         uint32_t message_length = *((uint32_t*) &v.data()[sizeof(time_t)]);
 
@@ -57,19 +62,17 @@ void *read_server_messages(void *arg) {
             n += q;
         }
 
-         std::string text_message = message.substr(0, message_length);
-         std::string username = message.substr(message_length, username_length);
+        std::string text_message = message.substr(0, message_length);
+        std::string username = message.substr(message_length, username_length);
 
-         std::tm * ptm = std::localtime(&time);
-         char buffer[32];
-         // Format: Mo, 15.06.2009 20:20:00
-         std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
-         printf("%s:%s:%s", buffer, username.c_str(), text_message.c_str());
-      }
+        std::tm * ptm = std::localtime(&time);
+        char buffer[32];
+        std::strftime(buffer, 32, "%H:%M", ptm);
+        printf("<%s> [%s] %s", buffer, username.c_str(), text_message.c_str());
+    }
 }
 
 void send_message_to_server(int sockfd, char *message, char* username) {
-    /* Send message to the server */
     uint32_t message_length = strlen(message);
     uint32_t username_length = strlen(username);
     std::stringbuf buf;
@@ -77,23 +80,24 @@ void send_message_to_server(int sockfd, char *message, char* username) {
     buf.sputn((char *) &username_length, sizeof username_length);
     buf.sputn(message, message_length);
     buf.sputn(username, username_length);
-    char buffer[256];
-    //buf.
     for (char c : buf.str()) {
-        // TODO check
         int n = write(sockfd, &c, 1);
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
     }
 }
 
 void client_loop(int sockfd, char *username) {
     char buffer[256];
-
-    /* Now ask for a message from the user, this message
-       * will be read by server
-    */
     while (true) {
         bzero(buffer, 256);
         fgets(buffer, 255, stdin);
+        if (feof(stdin)) {
+            stopped.store(true);
+            break;
+        }
         if (buffer[0] == '\0') {
             return;
         }
@@ -102,7 +106,7 @@ void client_loop(int sockfd, char *username) {
 }
 
 int main(int argc, char *argv[]) {
-
+    stopped.store(false);
     int sockfd, err;
 
     if (argc < 4) {
@@ -155,9 +159,8 @@ int main(int argc, char *argv[]) {
     }
 
     pthread_t thread;
-    // TODO process res
-    int res = pthread_create(&thread, nullptr, read_server_messages, (void*) &sockfd);
+    pthread_create(&thread, nullptr, read_server_messages, (void*) &sockfd);
     client_loop(sockfd, username);
     pthread_join(thread, nullptr);
-     return 0;
+    return 0;
 }
