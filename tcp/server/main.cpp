@@ -98,7 +98,6 @@ void *client_pocess(void* arg) {
                 message += buffer[i];
             }
             n += q;
-            break;
         }
          std::string text_message = message.substr(0, message_length);
          std::string username = message.substr(message_length, username_length);

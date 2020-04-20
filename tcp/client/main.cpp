@@ -40,7 +40,7 @@ void *read_server_messages(void *arg) {
 
     n -= 2 * sizeof(uint32_t) + sizeof(time_t);
 
-    printf("Here is the message: %d\n", n);
+    printf("Here is the message: %d\n", message_length + username_length);
     std::string message = "";
     for (int i = 2 * sizeof(uint32_t) + sizeof(time_t); i < v.size(); i++) {
         message += v[i];
@@ -54,9 +54,9 @@ void *read_server_messages(void *arg) {
         }
         for (int i = 0; i < q; i++) {
             message += buffer[i];
+            printf("%c-", buffer[i]);
         }
         n += q;
-        break;
     }
     printf("Here is the message: %d\n", message.length());
 
@@ -86,10 +86,6 @@ void send_message_to_server(int sockfd, char *message, char* username) {
         printf("%d\n", (int)c);
     }
 
-//    if (n < 0) {
-//        perror("ERROR writing to socket");
-//        exit(n);
-//    }
 }
 
 void client_loop(int sockfd, char *username) {
