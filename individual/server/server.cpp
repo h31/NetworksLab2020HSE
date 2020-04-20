@@ -7,9 +7,7 @@ void server::loop() {
     std::cout << std::endl;
     while (running) {
         listen(socket_fd, 5);
-        unsigned int addr_size = sizeof(sockaddr_in);
-        sockaddr_in client_addr{};
-        int client_socket_fd = accept(socket_fd, reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
+        int client_socket_fd = connect_client();
         if (client_socket_fd < 0) {
             fprintf(stderr, "Error on accepting client: %d\n", client_socket_fd);
             continue;
@@ -35,5 +33,7 @@ void server::shutdown() {
 }
 
 int server::connect_client() const {
-
+    unsigned int addr_size = sizeof(sockaddr_in);
+    sockaddr_in client_addr{};
+    return accept(socket_fd, reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
 }

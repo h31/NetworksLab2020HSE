@@ -9,35 +9,20 @@
 class message {
 
 private:
-
-    unsigned int prefix_size;
-    unsigned int body_size;
-    std::shared_ptr<char> msg;
+    uint32_t body_size;
+    std::shared_ptr<char> body;
 
 public:
-    message(unsigned int body_size, char* prefix, unsigned int prefix_size = 4) : prefix_size(prefix_size), body_size(body_size) {
-        msg = std::shared_ptr<char>(new char[prefix_size + body_size], std::default_delete<char[]>());
-        memcpy(prefix, get_prefix_ptr(), prefix_size);
+    message(unsigned int body_size) : body_size(body_size) {
+        body = std::shared_ptr<char>(new char[body_size], std::default_delete<char[]>());
     }
 
-    char* get_prefix_ptr() const {
-        return msg.get();
+    char* get_body_ptr() const {
+        return body.get();
     }
 
-    char* get_body_ptr() {
-        return msg.get() + prefix_size;
-    }
-
-    unsigned int get_prefix_size() {
-        return prefix_size;
-    }
-
-    unsigned int get_body_size() {
-        return prefix_size;
-    }
-
-    unsigned int get_msg_size() const {
-        return prefix_size + body_size;
+    uint32_t get_body_size() const {
+        return body_size;
     }
 };
 
@@ -48,11 +33,13 @@ private:
 public:
     socket_io(int socket_fd) : socket_fd(socket_fd) {}
 
-    int read_bytes(unsigned int total_bytes, char* buffer) const;
+    uint32_t read_bytes(unsigned int total_bytes, char* buffer) const;
 
-    int write_bytes(unsigned int total_bytes, char* buffer) const;
+    uint32_t write_bytes(unsigned int total_bytes, char* buffer) const;
 
-    uint32_t read_int(char* buffer) const;
+    uint32_t read_int32(char* buffer) const;
+
+    uint32_t write_int32(uint32_t value) const;
 };
 
 

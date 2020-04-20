@@ -7,17 +7,17 @@ void client::loop() {
     fprintf(stdout, "Client has started with socket: %d", socket_fd);
     std::cout << std::endl;
     while (running) {
-        unsigned int prefix_size = 4;
+        uint32_t prefix_size = sizeof(uint32_t);
         char prefix[prefix_size];
-        unsigned int body_size = io.read_int(prefix);
+        uint32_t body_size = io.read_int32(prefix);
 
-        if (body_size < 0) {
+        if (body_size <= 0) {
             chat_ptr->remove_client(this);
             return;
         }
 
-        message msg(body_size, prefix, prefix_size);
-        if (io.read_bytes(body_size, msg.get_body_ptr()) < 0) {
+        message msg(body_size);
+        if (io.read_bytes(body_size, msg.get_body_ptr()) <= 0) {
             chat_ptr->remove_client(this);
             return;
         }
@@ -46,7 +46,7 @@ void client::send(const message& msg) {
         if (!running) {
             return;
         }
-        if (io.write_bytes(msg.get_msg_size(), msg.get_prefix_ptr()) < 0) {
+        if (io.write_int32(msg.get_body_size()) <= 0 || io.write_bytes(msg.get_body_size(), msg.get_body_ptr()) < 0) {
             shutdown();
         }
     });
