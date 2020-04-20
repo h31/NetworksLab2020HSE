@@ -81,6 +81,7 @@ void client_loop(int client_file_descriptor) {
         auto message = res.first;
         printf("Got message from %d: %s\n", client_file_descriptor, message.c_str());
         fflush(stdout);
+        message = "MESSAGE FROM " + std::to_string(client_file_descriptor) + ": " + message;
         clients_mutex.lock();
         for (auto client_fd : clients_descriptors) {
             int n = writen(client_fd, message.c_str(), message.size());

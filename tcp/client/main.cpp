@@ -8,17 +8,24 @@
 
 #include <string.h>
 #include <thread>
+#include <atomic>
+
+std::atomic_bool is_running;
 
 void read_loop(int sockfd) {
     char buffer[256];
 
-    while(true) {
+    while(is_running) {
         /* Now read server response */
         bzero(buffer, 256);
         int n = read(sockfd, buffer, 255);
 
         if (n < 0) {
             perror("ERROR reading from socket");
+            is_running = false;
+            exit(1);
+        } else if (n == 0) {
+            is_running = false;
             exit(1);
         }
 
@@ -28,7 +35,7 @@ void read_loop(int sockfd) {
 
 int writen(int fd, const char *buf, int len) {
     int count = 0;
-    while(len != 0){
+    while(is_running && len != 0){
         int n = write(fd, buf, len);
         if(n < 0) {
             perror("CANNOT WRITE");
@@ -100,9 +107,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    //std::thread messages(read_loop, sockfd);
+    is_running = true;
 
-    while(true) {
+    std::thread messages(read_loop, sockfd);
+
+    while(is_running) {
         /* Now ask for a message from the user, this message
            * will be read by server
         */
@@ -121,7 +130,9 @@ int main(int argc, char *argv[]) {
             perror("ERROR writing to socket");
             exit(1);
         }
-
+        if(!is_running) {
+            break;
+        }
         n = writen(sockfd, buffer, strlen(buffer));
 
         if (n < 0) {
