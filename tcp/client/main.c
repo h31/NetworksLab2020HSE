@@ -8,13 +8,35 @@
 
 #include <string.h>
 
+#include <protocol_utils.h>
+
+void end_of_connection(int socket) {
+    close(socket);
+    printf("Close connection\n");
+}
+
+void handle_eoc(int success, int socket) {
+    if (!success) {
+        end_of_connection(socket);
+    }
+}
+
+int fix_name(char *name) {
+    size_t len = strlen(name);
+    if (len > 0 && name[len - 1] == '\n') {
+        name[len - 1] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int sockfd, n, err;
     //uint16_t portno;
     //struct sockaddr_in serv_addr;
     //struct hostent *server;
-
-    char buffer[256];
+    const size_t BUFFER_SIZE = 256;
+    char buffer[BUFFER_SIZE];
 
     if (argc < 3) {
         fprintf(stderr, "usage %s hostname port\n", argv[0]);
@@ -69,18 +91,28 @@ int main(int argc, char *argv[]) {
        * will be read by server
     */
 
-    while(1) { 
-        printf("Please enter the message: ");
-        bzero(buffer, 256);
-        char* pointor = fgets(buffer, 255, stdin);
+    char name[BUFFER_SIZE];
+    printf("Please enter the nickname: ");
+    bzero(name, BUFFER_SIZE);
+    char* pname = fgets(name, BUFFER_SIZE - 1, stdin);
+    if (pname == NULL) {
+        end_of_connection(sockfd);
+        return 0;
+    }
+    fix_name(name);
+    send_msg(sockfd, name);
 
-        if (pointor == NULL) {
-            printf("Shutdown\n");
-            close(sockfd);
-            break;
+    while(1) {
+        printf("Please enter the message: ");
+        bzero(buffer, BUFFER_SIZE);
+        char* pnt = fgets(buffer, BUFFER_SIZE - 1, stdin);
+
+        if (pnt == NULL) {
+            end_of_connection(sockfd);
+            return 0;
         }
         /* Send message to the server */
-        n = write(sockfd, buffer, strlen(buffer));
+        n = send_msg(sockfd, buffer);
 
         if (n < 0) {
             perror("ERROR writing to socket");
@@ -88,8 +120,8 @@ int main(int argc, char *argv[]) {
         }
 
         /* Now read server response */
-        bzero(buffer, 256);
-        n = read(sockfd, buffer, 255);
+        bzero(buffer, BUFFER_SIZE);
+        n = read_msg(sockfd, buffer);
 
         if (n < 0) {
             perror("ERROR reading from socket");

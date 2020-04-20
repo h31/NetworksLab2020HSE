@@ -4,4 +4,5 @@ project(server)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
 
 set(SOURCE_FILES main.c)
+include_directories("../")
 add_executable(server ${SOURCE_FILES})

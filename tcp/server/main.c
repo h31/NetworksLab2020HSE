@@ -6,6 +6,9 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <time.h>
+
+#include <protocol_utils.h>
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd;
@@ -51,11 +54,22 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    char name[256];
+    bzero(name, 256);
+    n = read_msg(newsockfd, name); // recv on Windows
+
+    if (n == 0) {
+        printf("End of connection\n");
+        return 0;
+    }
+
+    printf("%s connected!\n", name);
+    
     while(1) {
 
 
         bzero(buffer, 256);
-        n = read(newsockfd, buffer, 255); // recv on Windows
+        n = read_msg(newsockfd, buffer); // recv on Windows
 
         if (n == 0) {
             printf("End of connection\n");
@@ -67,9 +81,17 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
 
-        printf("Here is the message: %s\n", buffer);
+        time_t rawtime;
+        struct tm * timeinfo;
 
-        n = write(newsockfd, "I got your message", 18); // send on Windows
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+
+        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, name, buffer);
+
+        n = send_msg(newsockfd, "I got your message"); // send on Windows
 
         if (n < 0) {
             perror("ERROR writing to socket");
