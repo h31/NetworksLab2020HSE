@@ -50,12 +50,17 @@ int main(int argc, char *argv[]) {
         perror("ERROR on accept");
         exit(1);
     }
-    
+
     while(1) {
 
 
         bzero(buffer, 256);
         n = read(newsockfd, buffer, 255); // recv on Windows
+
+        if (n == 0) {
+            printf("End of connection\n");
+            break;
+        }
 
         if (n < 0) {
             perror("ERROR reading from socket");

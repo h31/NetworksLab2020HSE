@@ -72,8 +72,13 @@ int main(int argc, char *argv[]) {
     while(1) { 
         printf("Please enter the message: ");
         bzero(buffer, 256);
-        fgets(buffer, 255, stdin);
+        char* pointor = fgets(buffer, 255, stdin);
 
+        if (pointor == NULL) {
+            printf("Shutdown\n");
+            close(sockfd);
+            break;
+        }
         /* Send message to the server */
         n = write(sockfd, buffer, strlen(buffer));
 
