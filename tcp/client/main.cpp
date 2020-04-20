@@ -18,55 +18,54 @@ void *read_server_messages(void *arg) {
     int newsockfd = *(int *) arg;
     while (true) {
 
-    bzero(buffer, 256);
-    size_t n = 0;
+        bzero(buffer, 256);
+        size_t n = 0;
 
-    std::vector<char> v;
-    while (n < 2 * sizeof(uint32_t) + sizeof(time_t)) {
-        int q = read(newsockfd, buffer, 255);
-        if (q < 0) {
-            perror("ERROR reading from socket");
-            exit(1);
-        }
-        for (int i = 0; i < q; i++) {
-            v.push_back(buffer[i]);
-        }
-        n += q;
+        std::vector<char> v;
+        while (n < 2 * sizeof(uint32_t) + sizeof(time_t)) {
+            int q = read(newsockfd, buffer, 255);
+            if (q < 0) {
+                perror("ERROR reading from socket");
+                exit(1);
+            }
+            for (int i = 0; i < q; i++) {
+                v.push_back(buffer[i]);
+            }
+            n += q;
     }
+        time_t time = *((time_t*) v.data());
+        uint32_t message_length = *((uint32_t*) &v.data()[sizeof(time_t)]);
 
-    uint32_t message_length = *((uint32_t*) &v.data()[sizeof(time_t)]);
+        uint32_t username_length = *((uint32_t*) &v.data()[sizeof(uint32_t) + sizeof (uint32_t)]);
 
-    uint32_t username_length = *((uint32_t*) &v.data()[sizeof(uint32_t) + sizeof (uint32_t)]);
+        n -= 2 * sizeof(uint32_t) + sizeof(time_t);
 
-    n -= 2 * sizeof(uint32_t) + sizeof(time_t);
+        std::string message = "";
+        for (int i = 2 * sizeof(uint32_t) + sizeof(time_t); i < v.size(); i++) {
+            message += v[i];
 
-    printf("Here is the message: %d\n", message_length + username_length);
-    std::string message = "";
-    for (int i = 2 * sizeof(uint32_t) + sizeof(time_t); i < v.size(); i++) {
-        message += v[i];
-
-    }
-    while (n < message_length + username_length) {
-        int q = read(newsockfd, buffer, 255);
-        if (q < 0) {
-            perror("ERROR reading from socket");
-            exit(1);
         }
-        for (int i = 0; i < q; i++) {
-            message += buffer[i];
-            printf("%c-", buffer[i]);
+        while (n < message_length + username_length) {
+            int q = read(newsockfd, buffer, 255);
+            if (q < 0) {
+                perror("ERROR reading from socket");
+                exit(1);
+            }
+            for (int i = 0; i < q; i++) {
+                message += buffer[i];
+            }
+            n += q;
         }
-        n += q;
-    }
-    printf("Here is the message: %d\n", message.length());
 
-     std::string text_message = message.substr(0, message_length);
-     std::string username = message.substr(message_length, username_length);
-     printf("Here is the message: %s\n", text_message.c_str());
+         std::string text_message = message.substr(0, message_length);
+         std::string username = message.substr(message_length, username_length);
 
-     printf("Here is the message: %s\n", username.c_str());
-
-    }
+         std::tm * ptm = std::localtime(&time);
+         char buffer[32];
+         // Format: Mo, 15.06.2009 20:20:00
+         std::strftime(buffer, 32, "%a, %d.%m.%Y %H:%M:%S", ptm);
+         printf("%s:%s:%s", buffer, username.c_str(), text_message.c_str());
+      }
 }
 
 void send_message_to_server(int sockfd, char *message, char* username) {
@@ -83,9 +82,7 @@ void send_message_to_server(int sockfd, char *message, char* username) {
     for (char c : buf.str()) {
         // TODO check
         int n = write(sockfd, &c, 1);
-        printf("%d\n", (int)c);
     }
-
 }
 
 void client_loop(int sockfd, char *username) {
@@ -105,20 +102,6 @@ void client_loop(int sockfd, char *username) {
 }
 
 int main(int argc, char *argv[]) {
-//    uint32_t message_length = strlen("1");
-//    uint32_t username_length = strlen("username");
-//    std::stringbuf buf;
-//    buf.sputn((char *) &message_length, sizeof message_length);
-////    buf.sputn((char *) &username_length, sizeof username_length);
-//    buf.sputn("1", strlen("1"));
-//    buf.sputn("username", strlen("username"));
-//    for (char c : buf.str()) {
-//        printf("%d\n", int (c));
-//    }
-//    printf("%s\n", buf.str().c_str());
-//    uint32_t message = *((uint32_t*) buf.str().c_str());
-//    printf("Here is the message: %d\n", message);
-
 
     int sockfd, err;
 

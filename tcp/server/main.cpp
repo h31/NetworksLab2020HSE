@@ -37,7 +37,6 @@ void send_message_to_all_clients(const char *text_message, const char *username)
                 exit(1);
             }
         }
-        printf("%d\n", (int)c);
     }
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -63,7 +62,6 @@ void *client_pocess(void* arg) {
             n += q;
         }
         uint32_t message_length = *((uint32_t*) v.data());
-        printf("Here is the message: %d\n", message_length);
 
         n -= sizeof(uint32_t);
         while (n < sizeof(uint32_t)) {
@@ -78,14 +76,12 @@ void *client_pocess(void* arg) {
             n += q;
         }
         uint32_t username_length = *((uint32_t*) &v.data()[sizeof(uint32_t)]);
-        printf("Here is the message: %d\n", username_length);
 
         n -= sizeof(uint32_t);
 
         std::string message = "";
         for (int i = 2 * sizeof(uint32_t); i < v.size(); i++) {
             message += v[i];
-            perror("here");
 
         }
         while (n < message_length + username_length) {
