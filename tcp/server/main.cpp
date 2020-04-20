@@ -124,14 +124,14 @@ void process_message_buffer(std::deque<uint8_t> &message_buffer, std::string &na
     }
 }
 
-void *client_receive_loop(void *socket_fd_ptr) {
+void *client_receive_loop(void *client_socket_fd_ptr) {
     pthread_detach(pthread_self());
 
-    int socket_fd = *((int *) socket_fd_ptr);
-    delete ((int *) socket_fd_ptr);
+    int client_socket = *((int *) client_socket_fd_ptr);
+    delete ((int *) client_socket_fd_ptr);
 
     pthread_mutex_lock(&send_mutex);
-    client_sockets.insert(socket_fd);
+    client_sockets.insert(client_socket);
     pthread_mutex_unlock(&send_mutex);
 
     std::string name;
@@ -142,13 +142,12 @@ void *client_receive_loop(void *socket_fd_ptr) {
     bool continue_reading = true;
     int n = 0;
     while (continue_reading) {
-        n = read(socket_fd, &net_buffer, 256);
+        n = read(client_socket, &net_buffer, 256);
         if (n > 0) {
             message_buffer.insert(message_buffer.end(), net_buffer, net_buffer + n);
             process_message_buffer(message_buffer, name, authenticated);
-        } else if (n != EINTR ||
-                   !stop) { // do not stop on SIGINT. This thread will terminate gracefully after reading EOF from client.
-            continue_reading = false;
+        } else if (n != EINTR || !stop) { // do not stop on SIGINT. This thread will terminate gracefully
+            continue_reading = false;     // after reading EOF from client.
         }
     }
 
@@ -156,12 +155,15 @@ void *client_receive_loop(void *socket_fd_ptr) {
         std::cerr << "error reading from socket: " << std::strerror(errno) << std::endl;
     }
     pthread_mutex_lock(&send_mutex);
-    close(socket_fd);
-    client_sockets.erase(socket_fd);
+    close(client_socket);
+    client_sockets.erase(client_socket);
     pthread_mutex_unlock(&send_mutex);
 
     pthread_mutex_lock(&thread_count_mutex);
     client_thread_count--;
+    if (client_thread_count == 0) {
+        pthread_cond_broadcast(&thread_count_cond);
+    }
     pthread_mutex_unlock(&thread_count_mutex);
     return nullptr;
 }
@@ -201,8 +203,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_fd < 0) {
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket < 0) {
         std::cerr << "ERROR opening socket: " << strerror(errno) << std::endl;
         return 1;
     }
@@ -210,15 +212,15 @@ int main(int argc, char *argv[]) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
-    if (bind(socket_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
+    if (bind(server_socket, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
         std::cerr << "ERROR on binding: " << strerror(errno) << std::endl;
         return 1;
     }
 
-    listen(socket_fd, 5);
+    listen(server_socket, 5);
     init_mutexes();
     while (true) {
-        int child_fd = accept(socket_fd, nullptr, nullptr);
+        int child_fd = accept(server_socket, nullptr, nullptr);
         if (stop) {
             break;
         }
@@ -243,7 +245,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_lock(&send_mutex);
     for (int client_socket: client_sockets) {
-        shutdown(SHUT_WR, client_socket);
+        shutdown(client_socket, SHUT_WR);
     }
     client_sockets.clear();
     pthread_mutex_unlock(&send_mutex);
@@ -255,7 +257,8 @@ int main(int argc, char *argv[]) {
         pthread_cond_wait(&thread_count_cond, &thread_count_mutex);
     }
     pthread_mutex_unlock(&thread_count_mutex);
-
+    
+    close(server_socket);
     destroy_mutexes();
     return 1;
 }

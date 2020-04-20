@@ -168,7 +168,7 @@ static int open_connection(addrinfo *addrs, int &sockfd) {
 }
 
 int main(int argc, char *argv[]) {
-    int sockfd = -1;
+    int socket_fd = -1;
     int result;
     int err;
 
@@ -197,18 +197,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    err = open_connection(addrs, sockfd);
+    err = open_connection(addrs, socket_fd);
     freeaddrinfo(addrs);
 
-    if (sockfd == -1) {
+    if (socket_fd == -1) {
         std::cerr << hostname << ": " << std::strerror(err) << std::endl;
         return 1;
     }
 
     pthread_t client_handler;
-    pthread_create(&client_handler, nullptr, fd_reader_loop, &sockfd);
+    pthread_create(&client_handler, nullptr, fd_reader_loop, &socket_fd);
 
-    result = write_auth_message_to_socket(name, sockfd);
+    result = write_auth_message_to_socket(name, socket_fd);
     if (result != 0) {
         std::cerr << "cannot write message to socket: " << strerror(errno) << std::endl;
     }
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
         if (socket_closed || msg == ":q") {
             break;
         }
-        result = write_text_message_to_socket(msg, sockfd);
+        result = write_text_message_to_socket(msg, socket_fd);
         if (result < 0) {
             std::cerr << "cannot write message to socket: " << strerror(errno) << std::endl;
         }
@@ -228,7 +228,7 @@ int main(int argc, char *argv[]) {
 
     stopped_reading_input = true;
     if (!socket_closed) {
-        shutdown(sockfd, SHUT_WR);
+        shutdown(socket_fd, SHUT_WR);
     }
 
     pthread_join(client_handler, nullptr);
