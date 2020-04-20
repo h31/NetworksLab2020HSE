@@ -78,7 +78,7 @@ static int write_buffer_to_socket(std::vector<uint8_t> &buffer, int socket_fd) {
         int n = write(socket_fd, &buffer[0], buffer.size() - bytes_written);
         if (n > 0) {
             bytes_written += n;
-        } else {
+        } else if (n != EINTR || !stop) { // do not return on SIGINT
             result = n; // -1
         }
     }
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
         pthread_cond_wait(&thread_count_cond, &thread_count_mutex);
     }
     pthread_mutex_unlock(&thread_count_mutex);
-    
+
     close(server_socket);
     destroy_mutexes();
     return 1;
