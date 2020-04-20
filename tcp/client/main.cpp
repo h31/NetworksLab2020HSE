@@ -8,13 +8,42 @@
 
 #include <string.h>
 
+void client_loop(int sockfd) {
+    char buffer[256];
+
+    /* Now ask for a message from the user, this message
+       * will be read by server
+    */
+
+    printf("Please enter the message: ");
+    bzero(buffer, 256);
+    fgets(buffer, 255, stdin);
+
+    /* Send message to the server */
+    int n = write(sockfd, buffer, strlen(buffer));
+
+    if (n < 0) {
+        perror("ERROR writing to socket");
+        exit(1);
+    }
+
+    /* Now read server response */
+    bzero(buffer, 256);
+    n = read(sockfd, buffer, 255);
+
+    if (n < 0) {
+        perror("ERROR reading from socket");
+        exit(1);
+    }
+
+    printf("%s\n", buffer);
+}
+
 int main(int argc, char *argv[]) {
-    int sockfd, n, err;
+    int sockfd, err;
     //uint16_t portno;
     //struct sockaddr_in serv_addr;
     //struct hostent *server;
-
-    char buffer[256];
 
     if (argc < 3) {
         fprintf(stderr, "usage %s hostname port\n", argv[0]);
@@ -29,7 +58,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
-    err = getaddrinfo(hostname, port, &hints, &addrs); // gethostbyname is deprecated
+    err = getaddrinfo(hostname, port, &hints, &addrs);
     if (err != 0)
     {
         fprintf(stderr, "%s: %s\n", hostname, gai_strerror(err));
@@ -64,32 +93,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-
-    /* Now ask for a message from the user, this message
-       * will be read by server
-    */
-
-    printf("Please enter the message: ");
-    bzero(buffer, 256);
-    fgets(buffer, 255, stdin);
-
-    /* Send message to the server */
-    n = write(sockfd, buffer, strlen(buffer));
-
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
+    while (true) {
+        client_loop(sockfd);
     }
-
-    /* Now read server response */
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, 255);
-
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
-    }
-
-    printf("%s\n", buffer);
     return 0;
 }

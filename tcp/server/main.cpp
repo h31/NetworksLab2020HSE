@@ -6,14 +6,56 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <pthread.h>
+
+void *client_pocess(void* arg) {
+    char buffer[256];
+    int newsockfd = *(int *)arg;
+    while (true) {
+        bzero(buffer, 256);
+        ssize_t n = read(newsockfd, buffer, 255);
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+
+        printf("Here is the message: %s\n", buffer);
+
+        n = write(newsockfd, "I got your message", 18);
+
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+    }
+}
+
+void server_loop(int sockfd) {
+    sockaddr_in cli_addr;
+
+    unsigned int clilen = sizeof(cli_addr);
+    // TODO free it
+    int *newsockfd = new int(0);
+    *newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+
+    if (*newsockfd < 0) {
+        perror("ERROR on accept");
+        exit(1);
+    }
+    // TODO join it somewhere
+    pthread_t thread;
+    // TODO process res
+    int res = pthread_create( &thread, NULL, client_pocess, (void*) newsockfd);
+
+}
+
+
 
 int main(int argc, char *argv[]) {
-    int sockfd, newsockfd;
+    int sockfd;
     uint16_t portno;
-    unsigned int clilen;
-    char buffer[256];
-    struct sockaddr_in serv_addr, cli_addr;
-    ssize_t n;
+    struct sockaddr_in serv_addr;
 
     if (argc < 2) {
         fprintf(stderr, "usage %s port\n", argv[0]);
@@ -42,31 +84,9 @@ int main(int argc, char *argv[]) {
     }
 
     listen(sockfd, 5);
-    clilen = sizeof(cli_addr);
-
-    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-
-    if (newsockfd < 0) {
-        perror("ERROR on accept");
-        exit(1);
+    while (true) {
+        server_loop(sockfd);
     }
-
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255); // recv on Windows
-
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
-    }
-
-    printf("Here is the message: %s\n", buffer);
-
-    n = write(newsockfd, "I got your message", 18); // send on Windows
-
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
-    }
-
+    close(sockfd);
     return 0;
 }
