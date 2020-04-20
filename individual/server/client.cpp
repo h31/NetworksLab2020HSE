@@ -9,15 +9,15 @@ void client::loop() {
     while (running) {
         uint32_t prefix_size = sizeof(uint32_t);
         char prefix[prefix_size];
-        uint32_t body_size = io.read_int32(prefix);
+        int32_t body_size = io.read_int32(prefix);
 
-        if (body_size <= 0) {
+        if (body_size < 0) {
             chat_ptr->remove_client(this);
             return;
         }
 
         message msg(body_size);
-        if (io.read_bytes(body_size, msg.get_body_ptr()) <= 0) {
+        if (io.read_bytes(body_size, msg.get_body_ptr()) < 0) {
             chat_ptr->remove_client(this);
             return;
         }
@@ -43,11 +43,9 @@ void client::shutdown() {
 
 void client::send(const message& msg) {
     boost::asio::post(write_thread,[=]() {
-        if (!running) {
+        if (io.write_int32(msg.get_body_size()) < 0 || io.write_bytes(msg.get_body_size(), msg.get_body_ptr()) < 0) {
+            chat_ptr->remove_client(this);
             return;
-        }
-        if (io.write_int32(msg.get_body_size()) <= 0 || io.write_bytes(msg.get_body_size(), msg.get_body_ptr()) < 0) {
-            shutdown();
         }
     });
 }

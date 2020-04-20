@@ -33,13 +33,13 @@ private:
 public:
     socket_io(int socket_fd) : socket_fd(socket_fd) {}
 
-    uint32_t read_bytes(unsigned int total_bytes, char* buffer) const;
+    int32_t read_bytes(unsigned int total_bytes, char* buffer) const;
 
-    uint32_t write_bytes(unsigned int total_bytes, char* buffer) const;
+    int32_t write_bytes(unsigned int total_bytes, char* buffer) const;
 
-    uint32_t read_int32(char* buffer) const;
+    int32_t read_int32(char* buffer) const;
 
-    uint32_t write_int32(uint32_t value) const;
+    int32_t write_int32(uint32_t value) const;
 };
 
 

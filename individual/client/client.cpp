@@ -25,6 +25,7 @@ void client::read_loop() {
         if (io.read_bytes(name_size, name_buffer) < 0) {
             exit(1);
         }
+        name_buffer[name_size] = '\0';
 
         int msg_size = io.read_int32(msg_size_buffer);
         if (msg_size < 0) {
@@ -35,6 +36,7 @@ void client::read_loop() {
         if (io.read_bytes(msg_size, msg_buffer) < 0) {
             exit(1);
         }
+        msg_buffer[msg_size] = '\0';
         std::string time_str = std::ctime(&time);
         printf("<%s> [%s] %s\n", time_str.substr( 0, time_str.length() -1  ).c_str(), name_buffer, msg_buffer);
     }
