@@ -42,31 +42,34 @@ int main(int argc, char *argv[]) {
     }
 
     listen(sockfd, 5);
+    
     clilen = sizeof(cli_addr);
 
     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-
     if (newsockfd < 0) {
         perror("ERROR on accept");
         exit(1);
     }
+    
+    while(1) {
 
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255); // recv on Windows
 
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
+        bzero(buffer, 256);
+        n = read(newsockfd, buffer, 255); // recv on Windows
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+
+        printf("Here is the message: %s\n", buffer);
+
+        n = write(newsockfd, "I got your message", 18); // send on Windows
+
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
     }
-
-    printf("Here is the message: %s\n", buffer);
-
-    n = write(newsockfd, "I got your message", 18); // send on Windows
-
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
-    }
-
     return 0;
 }
