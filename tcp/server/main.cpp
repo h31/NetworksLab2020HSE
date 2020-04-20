@@ -7,10 +7,30 @@
 
 #include <string.h>
 #include <pthread.h>
+#include <vector>
+
+std::vector<pthread_t*> threads_to_join;
+pthread_mutex_t clients_mutex;
+std::vector<int> clients_sockets;
+
+void send_message_to_all_clients(char *message) {
+    pthread_mutex_lock(&clients_mutex);
+    for (int client_socket : clients_sockets) {
+        int n = write(client_socket, message, strlen(message));
+
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+    }
+    pthread_mutex_unlock(&clients_mutex);
+
+}
 
 void *client_pocess(void* arg) {
     char buffer[256];
     int newsockfd = *(int *)arg;
+    delete (int*) arg;
     while (true) {
         bzero(buffer, 256);
         ssize_t n = read(newsockfd, buffer, 255);
@@ -22,12 +42,7 @@ void *client_pocess(void* arg) {
 
         printf("Here is the message: %s\n", buffer);
 
-        n = write(newsockfd, "I got your message", 18);
-
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
-        }
+        send_message_to_all_clients(buffer);
     }
 }
 
@@ -35,7 +50,6 @@ void server_loop(int sockfd) {
     sockaddr_in cli_addr;
 
     unsigned int clilen = sizeof(cli_addr);
-    // TODO free it
     int *newsockfd = new int(0);
     *newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 
@@ -43,10 +57,13 @@ void server_loop(int sockfd) {
         perror("ERROR on accept");
         exit(1);
     }
-    // TODO join it somewhere
-    pthread_t thread;
+    pthread_mutex_lock(&clients_mutex);
+    clients_sockets.push_back(*newsockfd);
+    pthread_mutex_unlock(&clients_mutex);
+    pthread_t *thread = new pthread_t();
+    threads_to_join.push_back(thread);
     // TODO process res
-    int res = pthread_create( &thread, NULL, client_pocess, (void*) newsockfd);
+    int res = pthread_create(thread, NULL, client_pocess, (void*) newsockfd);
 
 }
 
@@ -86,6 +103,10 @@ int main(int argc, char *argv[]) {
     listen(sockfd, 5);
     while (true) {
         server_loop(sockfd);
+    }
+    for (pthread_t *thread : threads_to_join) {
+        pthread_join(*thread, nullptr);
+        delete thread;
     }
     close(sockfd);
     return 0;
