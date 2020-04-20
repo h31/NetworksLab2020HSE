@@ -4,7 +4,7 @@
 #include "client.h"
 
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
+    if (argc < 4) {
         fprintf(stderr, "usage %s hostname port username\n", argv[0]);
         exit(0);
     }

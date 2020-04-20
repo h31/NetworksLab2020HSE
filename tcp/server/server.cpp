@@ -35,7 +35,6 @@ Server::Server(int port) {
 
 void Server::Serve() {
     std::cerr << "server started" << std::endl;
-
     while(true) {
         int newsockfd;
         unsigned int clilen;
@@ -56,7 +55,12 @@ void Server::Serve() {
 void Server::Notify(std::string msg) {
     for (int i = 0; i < clients.size(); i++) {
         int socket = clients[i].get()->GetSocket();
-        ssize_t n = write(socket, msg.data(), msg.length()); // send on Windows
+        int n = write(socket, std::to_string(msg.length()).data(), 4);
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+        n = write(socket, msg.data(), msg.length()); // send on Windows
         if (n < 0) {
             perror("ERROR writing to socket");
             exit(1);

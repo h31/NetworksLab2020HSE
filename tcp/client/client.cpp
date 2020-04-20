@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <thread>
 #include <iostream>
+#include <vector>
 
 Client::Client(char* hostname, char* port, char* username) {
     this->username = username;
@@ -26,24 +27,20 @@ Client::Client(char* hostname, char* port, char* username) {
         exit(1);
     }
 
-    for(struct addrinfo *addr = addrs; addr != nullptr; addr = addr->ai_next) {
+    for (struct addrinfo *addr = addrs; addr != nullptr; addr = addr->ai_next) {
         sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
         if (sockfd == -1) {
             err = errno;
             break;
         }
-
         if (connect(sockfd, addr->ai_addr, addr->ai_addrlen) == 0) {
             break;
         }
-
         err = errno;
         close(sockfd);
         sockfd = -1;
     }
-
     freeaddrinfo(addrs);
-
     if (sockfd == -1) {
         fprintf(stderr, "%s: %s\n", hostname, strerror(err));
         exit(1);
@@ -58,13 +55,18 @@ void Client::Run() {
 }
 
 void Client::listenToServer() {
-    char buffer[256];
-    char lengthBuf[4];
-    /* Now read server response */
+    char lenBuf[4];
     while (true) {
-        bzero(lengthBuf, 4);
-        bzero(buffer, 256);
-        int n = read(sockfd, buffer, 255);
+        std::cerr << "start listening\n";
+        bzero(lenBuf, 4);
+        int n = read(sockfd, lenBuf, 4);
+        if (n == 0) {
+            break;
+        }
+
+        int len = strtol(lenBuf, nullptr, 10);
+        std::vector<char> buffer(len + 1, 0);
+        n = read(sockfd, buffer.data(), len);
         if (n < 0) {
             perror("ERROR reading from socket");
             exit(1);
@@ -72,27 +74,23 @@ void Client::listenToServer() {
         if (n == 0) {
             break;
         }
-        std::cerr << buffer << std::endl;
+        std::cout << buffer.data() << std::endl;
     }
 }
 
 void Client::listenToUser() {
-    //char buffer[256];
-
-    //printf("Please enter the message: ");
     while (true) {
-        std::cerr << "user while\n";
-        //bzero(buffer, 256);
-        //fgets(buffer, 255, stdin);
-
         std::string input;
         std::getline(std::cin, input);
 
-        /* Send message to the server */
-        //int n = write(sockfd, buffer, strlen(buffer));
-
-        std::cerr << "input: " << input << std::endl;
-        int n = write(sockfd, input.data(), input.length());
+        //std::cerr << "input: " << input << std::endl;
+        input = "[" + username + "]: " + input;
+        int n = write(sockfd, std::to_string(input.length()).data(), 4);
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+        n = write(sockfd, input.data(), input.length());
         if (n < 0) {
             perror("ERROR writing to socket");
             exit(1);

@@ -13,12 +13,19 @@ Client::Client(int socket, Server* srv) {
 }
 
 void Client::Serve() {
-    const int BUF_SIZE = 256;
-    std::vector<char> buffer(BUF_SIZE, 0);
+    char lenBuf[4];
 
     while (true) {
-        std::fill(buffer.begin(), buffer.end(), 0);
-        ssize_t n = read(sockfd, buffer.data(), BUF_SIZE - 1); // recv on Windows
+        bzero(lenBuf, 4);
+        int n = read(sockfd, lenBuf, 4);
+        int len = strtol(lenBuf, nullptr, 10);
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+
+        std::vector<char> buffer(len + 1, 0);
+        n = read(sockfd, buffer.data(), len);
         if (n < 0) {
             perror("ERROR reading from socket");
             exit(1);
@@ -26,8 +33,8 @@ void Client::Serve() {
         if (n == 0) {
             break;
         }
-        printf("Here is the message: %s\n", buffer.data());
 
+        std::cerr << buffer.data() << std::endl;
         server->Notify(buffer.data());
     }
 }
