@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
     std::string name = std::string(argv[3]);
 
     if (name.length() > std::numeric_limits<uint16_t>::max()) {
-        std::cerr << "name is too long";
+        std::cerr << "name is too long" << std::endl;
         return 1;
     }
 
@@ -219,6 +219,10 @@ int main(int argc, char *argv[]) {
 
         if (socket_closed || msg == ":q") {
             break;
+        }
+        if (msg.length() > std::numeric_limits<uint16_t>::max()) {
+            std::cerr << "message is too long" << std::endl;
+            continue;
         }
         result = write_text_message_to_socket(msg, socket_fd);
         if (result < 0) {
