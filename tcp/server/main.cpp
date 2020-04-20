@@ -183,6 +183,7 @@ static void destroy_mutexes() {
 
 int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN); // handling error codes from read/write is better
+
     struct sigaction sigint_handler{};
     sigint_handler.sa_handler = receive_sigint;
     sigemptyset(&sigint_handler.sa_mask);

@@ -168,6 +168,8 @@ static int open_connection(addrinfo *addrs, int &sockfd) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGPIPE, SIG_IGN); // handling error codes from read/write is better
+
     int socket_fd = -1;
     int result;
     int err;
