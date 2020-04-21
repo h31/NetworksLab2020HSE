@@ -9,36 +9,34 @@
 #include <string>
 #include <pthread.h>
 #include <vector>
-#include <sstream>
 #include <ctime>
 #include <atomic>
 
 std::vector<pthread_t*> threads_to_join;
 pthread_mutex_t clients_mutex;
 std::vector<int> clients_sockets;
-std::atomic<bool> stopped;
 
 void send_message_to_all_clients(const char *text_message, const char *username) {
     pthread_mutex_lock(&clients_mutex);
 
     uint32_t message_length = strlen(text_message);
     uint32_t username_length = strlen(username);
-    std::stringbuf buf;
     std::time_t cur_time = std::time(nullptr);
 
-    buf.sputn((char *) &cur_time, sizeof cur_time);
-    buf.sputn((char *) &message_length, sizeof message_length);
-    buf.sputn((char *) &username_length, sizeof username_length);
-    buf.sputn(text_message, message_length);
-    buf.sputn(username, username_length);
-    for (char c : buf.str()) {
-        for (int client_socket : clients_sockets) {
-            int n = write(client_socket, &c, 1);
-            if (n < 0) {
-                perror("ERROR writing to socket");
-                exit(1);
-            }
+    std::vector<char> buffer;
+    buffer.insert(buffer.end(), (char *) &cur_time, ((char *) &cur_time) + sizeof(cur_time));
+    buffer.insert(buffer.end(), (char *) &message_length, ((char *) &message_length) + sizeof(message_length));
+    buffer.insert(buffer.end(), (char *) &username_length, ((char *) &username_length) + sizeof(username_length));
+    buffer.insert(buffer.end(), text_message, text_message + message_length);
+    buffer.insert(buffer.end(), username, username + username_length);
+
+    for (int client_socket : clients_sockets) {
+        int n = write(client_socket, buffer.data(), buffer.size());
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
         }
+
     }
     pthread_mutex_unlock(&clients_mutex);
 }
@@ -48,70 +46,44 @@ void *client_process(void* arg) {
     int newsockfd = *(int *)arg;
     delete (int*) arg;
     while (true) {
-        if (stopped.load()) {
-            break;
-        }
         bzero(buffer, 256);
-        size_t n = 0;
-
-        std::vector<char> v;
-        while (n < sizeof(uint32_t)) {
-            int q = read(newsockfd, buffer, 255);
-            if (q < 0) {
+        std::vector<char> client_message;
+        static const int header_size = 2 * sizeof (uint32_t);
+        while (client_message.size() < header_size) {
+            int n = read(newsockfd, buffer, 255);
+            if (n < 0) {
                 perror("ERROR reading from socket");
                 exit(1);
             }
-            for (int i = 0; i < q; i++) {
-                v.push_back(buffer[i]);
-            }
-            n += q;
+            client_message.insert(client_message.end(), buffer, buffer + n);
         }
-        uint32_t message_length = *((uint32_t*) v.data());
+        uint32_t message_length = *((uint32_t*) client_message.data());
+        uint32_t username_length = *((uint32_t*) &client_message.data()[sizeof(uint32_t)]);
 
-        n -= sizeof(uint32_t);
-        while (n < sizeof(uint32_t)) {
-            int q = read(newsockfd, buffer, 255);
-            if (q < 0) {
+        while (client_message.size() < header_size + message_length + username_length) {
+            int n = read(newsockfd, buffer, 255);
+            if (n < 0) {
                 perror("ERROR reading from socket");
                 exit(1);
             }
-            for (int i = 0; i < q; i++) {
-                v.push_back(buffer[i]);
-            }
-            n += q;
+            client_message.insert(client_message.end(), buffer, buffer + n);
         }
-        uint32_t username_length = *((uint32_t*) &v.data()[sizeof(uint32_t)]);
+        std::vector<char> text_message = std::vector<char>(client_message.begin() + header_size,
+                                                           client_message.begin() + header_size + message_length);
+        text_message.push_back('\0');
+        std::vector<char> username = std::vector<char>(client_message.begin() + header_size + message_length,
+                                                       client_message.begin() + header_size + message_length + username_length);
+        username.push_back('\0');
 
-        n -= sizeof(uint32_t);
+        printf("[%s] %s\n", username.data(), text_message.data());
 
-        std::string message = "";
-        for (int i = 2 * sizeof(uint32_t); i < v.size(); i++) {
-            message += v[i];
-        }
-        while (n < message_length + username_length) {
-            int q = read(newsockfd, buffer, 255);
-            if (q < 0) {
-                perror("ERROR reading from socket");
-                exit(1);
-            }
-            for (int i = 0; i < q; i++) {
-                message += buffer[i];
-            }
-            n += q;
-        }
-        std::string text_message = message.substr(0, message_length);
-        std::string username = message.substr(message_length, username_length);
-        printf("Message: %s, from: %s\n", text_message.c_str(), username.c_str());
-
-        send_message_to_all_clients(text_message.c_str(), username.c_str());
+        send_message_to_all_clients(text_message.data(), username.data());
     }
+    return nullptr;
 }
 
+// accepts new client sockets
 void server_loop(int sockfd) {
-    if (feof(stdin)) {
-        stopped.store(false);
-        return;
-    }
     sockaddr_in cli_addr;
 
     unsigned int clilen = sizeof(cli_addr);
@@ -135,7 +107,6 @@ int main(int argc, char *argv[]) {
     int sockfd;
     uint16_t portno;
     struct sockaddr_in serv_addr;
-    stopped.store(false);
 
     if (argc < 2) {
         fprintf(stderr, "usage %s port\n", argv[0]);
