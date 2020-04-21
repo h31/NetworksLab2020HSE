@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.15)
 project(client)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES main.c)
-add_executable(client ${SOURCE_FILES})
+add_executable(client main.cpp ../utils.h)
