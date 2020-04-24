@@ -11,12 +11,11 @@
 #include <pthread.h>
 #include <atomic>
 #include <ctime>
+#include <poll.h>
+#include <asm/ioctls.h>
+#include <sys/ioctl.h>
 
 const int32_t BUFFER_SIZE = 4096;
-
-enum request_type {
-    REGISTER_MESSAGE = 0
-};
 
 struct message {
     std::string text;
@@ -25,18 +24,24 @@ struct message {
 };
 
 struct handler_context {
-    int server_socket;
+    int server_socket = 0;
     std::atomic_bool should_exit;
+    pthread_mutex_t mutex{};
+    std::queue<char> input;
+    std::queue<char> output;
 };
 
 void* handle_incoming(void *handler_context_pointer);
 void chat_loop(handler_context *context, std::string& login);
-std::vector<char> read_bytes(int32_t bytes_to_read, handler_context *context, std::queue<char>& input_queue);
-void write_bytes(handler_context *context, std::queue<char>& output_queue);
-uint32_t read_int32(handler_context *context, std::queue<char>& input_queue);
 void write_int32(uint32_t value, std::queue<char>& output_queue);
-void read_from_socket(handler_context *context, std::queue<char> &input_queue);
-void write_to_socket(int32_t bytes_to_write, handler_context *context, char *buffer);
+std::vector<char> read_bytes(int32_t bytes_to_read, std::queue<char>& input_queue);
+uint32_t read_int32(std::queue<char>& input_queue);
+uint32_t convert_to_uint32(std::vector<char>& char_vector);
+void write_to_socket(int socket, std::queue<char>& output_queue);
+void read_from_socket(int socket, std::queue<char> &input_queue);
+std::string extract_text(std::queue<char>& input_queue);
+bool can_extract_text(std::queue<char>& input_queue);
+void process_incoming(handler_context *context, int current_socket);
 
 int main(int argc, char *argv[]) {
     if (argc < 4) {
@@ -82,7 +87,10 @@ int main(int argc, char *argv[]) {
     }
 
     pthread_t handler_thread;
-    handler_context context { server_socket };
+    handler_context context;
+    context.server_socket = server_socket;
+    context.should_exit = false;
+    pthread_mutex_init(&context.mutex, nullptr);
     pthread_create(&handler_thread, nullptr, handle_incoming, &context);
 
     chat_loop(&context, login);
@@ -92,34 +100,50 @@ int main(int argc, char *argv[]) {
 
     shutdown(server_socket, SHUT_RDWR);
     pthread_join(handler_thread, &return_value);
+    pthread_mutex_destroy(&context.mutex);
 
     return 0;
 }
 
 void* handle_incoming(void *handler_context_pointer) {
     auto *context = (handler_context *)handler_context_pointer;
-    std::queue<char> input_queue;
 
-    try {
-        while (!context->should_exit) {
-            uint32_t message_number = read_int32(context, input_queue);
-            for (uint32_t i = 0; i < message_number; ++i) {
-                uint32_t message_size = read_int32(context, input_queue);
-                std::vector<char> text = read_bytes(message_size, context, input_queue);
-                std::string text_string;
+    pollfd server_poll{};
+    server_poll.fd = context->server_socket;
+    server_poll.events = POLLIN | POLLOUT;
 
-                for (char &c : text) {
-                    text_string += c;
+    while (!context->should_exit) {
+        int status = poll(&server_poll, 1, -1);
+        if (status < 1) {
+            break;
+        }
+
+        try {
+            if (!server_poll.revents) {
+                continue;
+            }
+            if (server_poll.revents & POLLIN) {
+                int nread = 0;
+                ioctl(context->server_socket, FIONREAD, &nread);
+                if (nread == 0) {
+                    break;
+                } else {
+                    process_incoming(context, context->server_socket);
                 }
-                std::cout << text_string << std::endl;
+            } else if (server_poll.revents & POLLOUT) {
+                pthread_mutex_lock(&context->mutex);
+                write_to_socket(context->server_socket, context->output);
+                pthread_mutex_unlock(&context->mutex);
             }
         }
-    } catch (const std::exception& e) {
-        perror(e.what());
-        shutdown(context->server_socket, SHUT_RDWR);
-        exit(0);
+        catch (const std::exception &e) {
+            perror(e.what());
+        }
     }
-    return nullptr;
+
+    shutdown(context->server_socket, SHUT_RDWR);
+    pthread_mutex_destroy(&context->mutex);
+    exit(0);
 }
 
 void write_message(message& message, std::queue<char>& output_queue) {
@@ -134,7 +158,6 @@ void write_message(message& message, std::queue<char>& output_queue) {
 
 void chat_loop(handler_context *context, std::string& login) {
     try {
-        std::queue<char> output_queue;
         while (true) {
             std::string input;
             getline(std::cin, input);
@@ -144,74 +167,74 @@ void chat_loop(handler_context *context, std::string& login) {
             }
 
             if (!input.empty()) {
-                write_int32(request_type::REGISTER_MESSAGE, output_queue);
                 time_t theTime = time(nullptr);
                 tm *current_time = localtime(&theTime);
                 message message = { input, login, *current_time };
-                write_message(message, output_queue);
+                pthread_mutex_lock(&context->mutex);
+                write_message(message, context->output);
+                pthread_mutex_unlock(&context->mutex);
             }
-            write_bytes(context, output_queue);
         }
     } catch (const std::runtime_error& e) {
         perror(e.what());
     }
 }
 
-std::vector<char> read_bytes(int32_t bytes_to_read, handler_context *context, std::queue<char>& input_queue) {
-    std::vector<char> result;
-    int32_t total_read = 0;
-
-    while (result.size() < bytes_to_read) {
-        while (result.size() < bytes_to_read && !input_queue.empty()) {
-            result.emplace_back(input_queue.front());
-            input_queue.pop();
-            total_read++;
-        }
-        if (total_read == bytes_to_read || context->should_exit) {
-            break;
-        }
-        read_from_socket(context, input_queue);
-    }
-    return result;
-}
-
-void write_bytes(handler_context *context, std::queue<char>& output_queue) {
-    char buffer[BUFFER_SIZE];
-    while (!output_queue.empty()) {
-        bzero(buffer, BUFFER_SIZE);
-        int32_t bytes_to_write = 0;
-        for (int i = 0; i < BUFFER_SIZE && !output_queue.empty(); ++i) {
-            buffer[i] = output_queue.front();
-            output_queue.pop();
-            ++bytes_to_write;
-        }
-        write_to_socket(bytes_to_write, context, buffer);
+void process_incoming(handler_context *context, int current_socket) {
+    read_from_socket(current_socket, context->input);
+    while (can_extract_text(context->input)) {
+        std::string incoming_text = extract_text(context->input);
+        std::cout << incoming_text << std::endl;
     }
 }
 
-void read_from_socket(handler_context *context, std::queue<char> &input_queue) {
+bool can_extract_text(std::queue<char>& input_queue) {
+    if (input_queue.size() < sizeof(uint32_t)) {
+        return false;
+    }
+
+    std::queue<char> tmp_queue(input_queue);
+
+    std::vector<char> char_bytes;
+    for (int i = 0; i < sizeof(uint32_t); ++i) {
+        char_bytes.push_back(tmp_queue.front());
+        tmp_queue.pop();
+    }
+    uint32_t message_size = convert_to_uint32(char_bytes);
+    return input_queue.size() >= sizeof(uint32_t) + message_size;
+}
+
+std::string extract_text(std::queue<char>& input_queue) {
+    uint32_t message_size = read_int32(input_queue);
+    std::vector<char> query_bytes = read_bytes(message_size, input_queue);
+    return std::string(query_bytes.begin(), query_bytes.end());
+}
+
+void read_from_socket(int socket, std::queue<char> &input_queue) {
     char buffer[BUFFER_SIZE];
     bzero(buffer, BUFFER_SIZE);
-    int32_t bytes_read = read(context->server_socket, buffer, BUFFER_SIZE);
-
-    if (bytes_read <= 0 || context->should_exit) {
-        throw std::runtime_error("Unable to read a response from the server.");
-    }
+    int32_t bytes_read = read(socket, buffer, BUFFER_SIZE);
     for (int i = 0; i < bytes_read; ++i) {
         input_queue.push(buffer[i]);
     }
 }
 
-void write_to_socket(int32_t bytes_to_write, handler_context *context, char *buffer) {
+void write_to_socket(int socket, std::queue<char>& output_queue) {
     int32_t total_written = 0;
-    while (bytes_to_write > 0) {
-        int32_t bytes_written = write(context->server_socket, buffer + total_written, bytes_to_write);
+    std::queue<char> tmp_queue(output_queue);
 
-        if (bytes_written <= 0 || context->should_exit) {
-            throw std::runtime_error("Unable to send a message to the server.");
-        }
-        total_written += bytes_written;
-        bytes_to_write -= bytes_written;
+    char buffer[BUFFER_SIZE];
+    bzero(buffer, BUFFER_SIZE);
+    int bytes_to_write = 0;
+    for (int i = 0; i < BUFFER_SIZE && !tmp_queue.empty(); ++i) {
+        buffer[i] = tmp_queue.front();
+        tmp_queue.pop();
+        bytes_to_write++;
+    }
+
+    int32_t bytes_written = write(socket, buffer + total_written, bytes_to_write);
+    for (int i = 0; i < bytes_written; i++) {
+        output_queue.pop();
     }
 }
 
@@ -225,9 +248,22 @@ uint32_t convert_to_uint32(std::vector<char>& char_vector) {
     return ntohl(result);
 }
 
-uint32_t read_int32(handler_context *context, std::queue<char>& input_queue) {
-    std::vector<char> char_bytes = read_bytes(sizeof(uint32_t), context, input_queue);
+uint32_t read_int32(std::queue<char>& input_queue) {
+    std::vector<char> char_bytes;
+    for (int i = 0; i < sizeof(uint32_t); ++i) {
+        char_bytes.push_back(input_queue.front());
+        input_queue.pop();
+    }
     return convert_to_uint32(char_bytes);
+}
+
+std::vector<char> read_bytes(int32_t bytes_to_read, std::queue<char>& input_queue) {
+    std::vector<char> char_bytes;
+    for (int i = 0; i < bytes_to_read; ++i) {
+        char_bytes.push_back(input_queue.front());
+        input_queue.pop();
+    }
+    return char_bytes;
 }
 
 void write_int32(uint32_t value, std::queue<char>& output_queue) {
