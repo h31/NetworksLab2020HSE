@@ -234,6 +234,7 @@ int main(int argc, char *argv[]) {
         }
         if (child_fd < 0) {
             std::cerr << "ERROR on accept: " << strerror(errno) << std::endl;
+            continue;
         }
 
         pthread_mutex_lock(&thread_count_mutex);
