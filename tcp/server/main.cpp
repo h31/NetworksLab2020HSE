@@ -269,5 +269,5 @@ int main(int argc, char *argv[]) {
 
     close(server_socket);
     destroy_mutexes();
-    return 1;
+    return 0;
 }
