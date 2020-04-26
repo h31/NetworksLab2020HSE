@@ -10,6 +10,9 @@
 #include <chrono>
 #include <csignal>
 #include <cstring>
+#include <fcntl.h>
+#include <poll.h>
+#include <climits>
 
 static const int MAX_PORT = 65535;
 static const int MIN_PORT = 1024;
@@ -18,18 +21,17 @@ static const int AUTH_OP = 0;
 static const int TEXT_OP = 1;
 static const int SERVER_MSG_OP = 2;
 
-static pthread_mutex_t thread_count_mutex;
-static int client_thread_count;
-static pthread_cond_t thread_count_cond;
+class ClientInfo {
+public:
+    int fd;
+    std::string name;
+    bool authenticated;
+    std::deque<uint8_t> output_buffer;
+    std::deque<uint8_t> input_buffer;
 
-static pthread_mutex_t send_mutex;
-static std::set<int> client_sockets;
-
-static volatile std::sig_atomic_t stop = false;
-
-static void receive_sigint(int signum) {
-    stop = true;
-}
+    explicit ClientInfo(int fd) : fd(fd), authenticated(false) {
+    }
+};
 
 static uint16_t str_to_port(std::string &port_str) {
     size_t end_pos = 0;
@@ -70,22 +72,11 @@ static void append_server_msg_to_buffer(std::vector<uint8_t> &buf, std::string &
     buf.insert(buf.end(), text.begin(), text.end());
 }
 
-// write may transfer fewer bytes than requested!
-static int write_buffer_to_socket(std::vector<uint8_t> &buffer, int socket_fd) {
-    int bytes_written = 0;
-    int result = 0;
-    while (bytes_written != buffer.size() && result == 0) {
-        int n = write(socket_fd, &buffer[0], buffer.size() - bytes_written);
-        if (n > 0) {
-            bytes_written += n;
-        } else if (n != EINTR || !stop) { // do not return on SIGINT
-            result = n; // -1
-        }
-    }
-    return result; // -1 or 0
-}
+void process_input_buffer(std::vector<ClientInfo> &clients, int client_num) {
+    ClientInfo &current_client = clients[client_num];
+    std::deque<uint8_t> &message_buffer = current_client.input_buffer;
+    bool &authenticated = current_client.authenticated;
 
-void process_message_buffer(std::deque<uint8_t> &message_buffer, std::string &name, bool &authenticated) {
     while (true) {
         if (message_buffer.empty()) {
             return;
@@ -108,86 +99,191 @@ void process_message_buffer(std::deque<uint8_t> &message_buffer, std::string &na
 
         if (op == AUTH_OP) {
             authenticated = true;
-            name = message;
+            current_client.name = message;
         } else { // op == TEXT_OP
             std::vector<uint8_t> output_msg;
-            append_server_msg_to_buffer(output_msg, name, message);
+            append_server_msg_to_buffer(output_msg, current_client.name, message);
 
-            pthread_mutex_lock(&send_mutex);
-            for (const int &socket: client_sockets) {
-                int n = write_buffer_to_socket(output_msg, socket);
-                if (n < 0) {
-                    std::cerr << "error writing to socket: " << strerror(errno) << std::endl;
-                }
+            for (ClientInfo &client: clients) {
+                client.output_buffer.insert(client.output_buffer.end(), output_msg.begin(), output_msg.end());
             }
-            pthread_mutex_unlock(&send_mutex);
         }
     }
 }
 
-void *client_receive_loop(void *client_socket_fd_ptr) {
-    pthread_detach(pthread_self());
+bool read_from_client(std::vector<pollfd> &fds, std::vector<ClientInfo> &clients, int client_num) {
+    ClientInfo &current_client = clients[client_num];
+    uint8_t bytes[256];
+    int n = read(current_client.fd, bytes, 256);
+    bool closed = false;
+    if (n > 0) {
+        current_client.input_buffer.insert(current_client.input_buffer.end(), bytes, bytes + n);
+        process_input_buffer(clients, client_num);
+    } else if (n == 0) {
+        close(current_client.fd);
+        closed = true;
+    } else if (n < 0) {
+        std::cerr << "ERROR reading from client: " << strerror(errno) << std::endl;
+        close(current_client.fd);
+        closed = true;
+    }
+    return closed;
+}
 
-    int client_socket = *((int *) client_socket_fd_ptr);
-    delete ((int *) client_socket_fd_ptr);
+bool write_to_client(ClientInfo &client) {
+    int to_send_size = std::min<int>(256, client.output_buffer.size());
+    std::vector<uint8_t> to_send(client.output_buffer.begin(), client.output_buffer.begin() + to_send_size);
+    int n = write(client.fd, &to_send[0], to_send_size);
+    bool closed = false;
+    if (n >= 0) {
+        client.output_buffer.erase(client.output_buffer.begin(), client.output_buffer.begin() + n);
+    } else {
+        std::cerr << "ERROR writing to client: " << strerror(errno) << std::endl;
+        close(client.fd);
+        closed = true;
+    }
+    return closed;
+}
 
-    pthread_mutex_lock(&send_mutex);
-    client_sockets.insert(client_socket);
-    pthread_mutex_unlock(&send_mutex);
+void accept_client(int server_socket, std::vector<pollfd> &fds, std::vector<ClientInfo> &clients) {
+    int child_fd = accept(server_socket, nullptr, nullptr);
+    if (child_fd < 0) {
+        std::cerr << "ERROR on accept: " << strerror(errno) << std::endl;
+        return;
+    }
+    fcntl(child_fd, F_SETFL, O_NONBLOCK);
+    pollfd child_poll_fd = {child_fd, POLLIN};
+    fds.push_back(child_poll_fd);
+    clients.emplace_back(child_fd);
+}
 
-    std::string name;
-    bool authenticated = false;
+void split_buffer_to_lines(std::deque<uint8_t> &bytes, std::vector<std::string> &lines) {
+    int first_unparsed_byte = 0;
+    for (int i = 0; i < bytes.size(); i++) {
+        if (bytes[i] == '\n') {
+            std::string line(bytes.begin() + first_unparsed_byte, bytes.begin() + i);
+            lines.push_back(line);
+            first_unparsed_byte = i + 1;
+        }
+    }
+    bytes.erase(bytes.begin(), bytes.begin() + first_unparsed_byte);
+}
 
-    std::deque<uint8_t> message_buffer;
-    uint8_t net_buffer[256];
-    bool continue_reading = true;
-    int n = 0;
-    while (continue_reading) {
-        n = read(client_socket, &net_buffer, 256);
-        if (n > 0) {
-            message_buffer.insert(message_buffer.end(), net_buffer, net_buffer + n);
-            process_message_buffer(message_buffer, name, authenticated);
-        } else if (n != EINTR || !stop) { // do not stop on SIGINT. This thread will terminate gracefully
-            continue_reading = false;     // after reading EOF from client.
+bool read_stdin(std::deque<uint8_t> &stdin_buffer) {
+    uint8_t bytes[256];
+    bool close = false;
+    int n = read(STDIN_FILENO, bytes, 256);
+    if (n >= 0) {
+        stdin_buffer.insert(stdin_buffer.end(), bytes, bytes + n);
+        std::vector<std::string> lines;
+        split_buffer_to_lines(stdin_buffer, lines);
+        for (std::string &line: lines) {
+            if (line == ":q") {
+                close = true;
+            }
+        }
+    } else {
+        std::cerr << "ERROR reading stdin: " << strerror(errno) << std::endl;
+        close = true;
+    }
+    return close;
+}
+
+void set_to_blocking_mode(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        std::cerr << "ERROR getting flags of fd: " << strerror(errno) << std::endl;
+        return;
+    }
+    flags &= ~O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, flags) < 0) {
+        std::cerr << "ERROR setting socket to non-blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
+}
+
+void close_sockets(int server_socket, std::vector<ClientInfo> &clients) {
+    for (ClientInfo &client: clients) {
+        shutdown(client.fd, SHUT_WR);
+        set_to_blocking_mode(client.fd);
+        uint8_t bytes[256];
+        int n;
+        while ((n = read(client.fd, bytes, 256)) > 0) {}
+
+        if (n == -1) {
+            std::cerr << "ERROR reading from socket: " << strerror(errno) << std::endl;
+        }
+        close(client.fd);
+    }
+    close(server_socket);
+}
+
+void main_server_routine(int server_socket) {
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+
+    int extra_fds_num = 2;
+    std::vector<pollfd> fds(extra_fds_num);
+    std::vector<ClientInfo> clients;
+    fds[0].fd = server_socket;
+    fds[0].events = POLLIN;
+    fds[1].fd = STDIN_FILENO;
+    fds[1].events = POLLIN;
+
+    std::deque<uint8_t> stdin_buffer;
+
+    while (true) {
+        int ret = poll(&fds[0], fds.size(), INT_MAX);
+        if (ret < 0) {
+            std::cerr << "ERROR in poll: " << strerror(errno) << std::endl;
+            break;
+        }
+
+        if (fds[1].revents & POLLIN) {
+            if (read_stdin(stdin_buffer)) break;
+        }
+        if (fds[0].revents & POLLIN) {
+            accept_client(fds[0].fd, fds, clients);
+        }
+
+        for (int i = extra_fds_num; i < fds.size(); i++) {
+            int client_num = i - extra_fds_num;
+            bool closed = false;
+
+            if (fds[i].revents & POLLIN) {
+                closed = read_from_client(fds, clients, client_num);
+            }
+            if (closed) {
+                fds.erase(fds.begin() + i);
+                clients.erase(clients.begin() + client_num);
+                i--;
+                continue;
+            }
+
+            if (fds[i].revents & POLLOUT) {
+                closed = write_to_client(clients[client_num]);
+            }
+            if (closed) {
+                fds.erase(fds.begin() + i);
+                clients.erase(clients.begin() + client_num);
+                i--;
+            }
+        }
+
+        fds[0].events = POLLIN;
+        fds[1].events = POLLIN;
+        for (int i = extra_fds_num; i < fds.size(); i++) {
+            fds[i].events = POLLIN;
+            if (!clients[i - extra_fds_num].output_buffer.empty()) {
+                fds[i].events |= POLLOUT;
+            }
         }
     }
 
-    if (n < 0) {
-        std::cerr << "error reading from socket: " << std::strerror(errno) << std::endl;
-    }
-    pthread_mutex_lock(&send_mutex);
-    close(client_socket);
-    client_sockets.erase(client_socket);
-    pthread_mutex_unlock(&send_mutex);
-
-    pthread_mutex_lock(&thread_count_mutex);
-    client_thread_count--;
-    if (client_thread_count == 0) {
-        pthread_cond_broadcast(&thread_count_cond);
-    }
-    pthread_mutex_unlock(&thread_count_mutex);
-    return nullptr;
-}
-
-static void init_mutexes() {
-    pthread_mutex_init(&send_mutex, nullptr);
-    pthread_mutex_init(&thread_count_mutex, nullptr);
-    pthread_cond_init(&thread_count_cond, nullptr);
-}
-
-static void destroy_mutexes() {
-    pthread_cond_destroy(&thread_count_cond);
-    pthread_mutex_destroy(&thread_count_mutex);
-    pthread_mutex_destroy(&send_mutex);
+    close_sockets(server_socket, clients);
 }
 
 int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN); // handling error codes from read/write is better
-
-    struct sigaction sigint_handler{};
-    sigint_handler.sa_handler = receive_sigint;
-    sigemptyset(&sigint_handler.sa_mask);
-    sigaction(SIGINT, &sigint_handler, nullptr);
 
     uint16_t port;
     sockaddr_in server_addr{}; // zero-initialized
@@ -219,49 +315,9 @@ int main(int argc, char *argv[]) {
         std::cerr << "ERROR on binding: " << strerror(errno) << std::endl;
         return 1;
     }
-
+    fcntl(server_socket, F_SETFL, O_NONBLOCK);
     listen(server_socket, 5);
-    init_mutexes();
-    while (true) {
-        int child_fd = accept(server_socket, nullptr, nullptr);
-        if (stop) {
-            break;
-        }
-        if (child_fd < 0) {
-            std::cerr << "ERROR on accept: " << strerror(errno) << std::endl;
-        }
+    main_server_routine(server_socket);
 
-        pthread_mutex_lock(&thread_count_mutex);
-        client_thread_count++;
-        pthread_mutex_unlock(&thread_count_mutex);
-
-        pthread_t client_handler; // identifiers are safe to reuse
-        int res = pthread_create(&client_handler, nullptr, client_receive_loop, new int(child_fd));
-        if (res != 0) {
-            std::cerr << "cannot create thread: " << strerror(errno) << std::endl;
-            // thread was not created:
-            pthread_mutex_lock(&thread_count_mutex);
-            client_thread_count--;
-            pthread_mutex_unlock(&thread_count_mutex);
-        }
-    }
-
-    pthread_mutex_lock(&send_mutex);
-    for (int client_socket: client_sockets) {
-        shutdown(client_socket, SHUT_WR);
-    }
-    client_sockets.clear();
-    pthread_mutex_unlock(&send_mutex);
-
-    // wait for all threads to stop
-    // no need to join threads because they are detached
-    pthread_mutex_lock(&thread_count_mutex);
-    while (client_thread_count != 0) {
-        pthread_cond_wait(&thread_count_cond, &thread_count_mutex);
-    }
-    pthread_mutex_unlock(&thread_count_mutex);
-
-    close(server_socket);
-    destroy_mutexes();
-    return 1;
+    return 0;
 }
