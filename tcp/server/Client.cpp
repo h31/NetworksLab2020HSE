@@ -1,71 +1,19 @@
 #include "Client.h"
 
 #include <iostream>
-#include <utility>
 #include "Server.h"
 #include "../ioutils.h"
 
-namespace {
-    class MessageWriteTask : public Runnable {
-    public:
-        MessageWriteTask(int socketFD, const Message& message, std::weak_ptr<Client> client)
-                : m_socketFD(socketFD), m_message(message), m_client(std::move(client)) {}
 
-        void run() override {
-            if (writeFullBuffer(m_socketFD, m_message.data(), m_message.size()) != 0) {
-                if (auto ptr = m_client.lock()) {
-                    if (!ptr->stopped()) {
-                        std::cerr << "Error while writing to client" << std::endl;
-                        ptr->shutdown();
-                    }
-                }
-            }
-        }
+Client::Client(int socketFD, Server* server) : m_socketFD(socketFD), m_server(server) {}
 
-    private:
-        int m_socketFD;
-        Message m_message;
-        std::weak_ptr<Client> m_client;
-    };
-}
-
-Client::Client(int socketFD, Server* server)
-        : m_socketFD(socketFD), m_server(server), m_thread(&Client::run, this) {}
-
-void Client::send(const Message& message, const std::shared_ptr<Client>& client) {
-    m_pool.execute(std::make_shared<MessageWriteTask>(m_socketFD, message, client));
-}
-
-void Client::run() {
-    char length_buffer[4];
-
-    while (!m_stop) {
-        if (readFullBuffer(m_socketFD, length_buffer, 4) == 0) {
-            auto length = intFromArray<uint32_t>(length_buffer);
-            Message message(length);
-            if (readFullBuffer(m_socketFD, message.writeDst(), length) == 0) {
-                m_server->newMessage(message);
-                continue;
-            }
-        }
-        if (m_stop) {
-            return;
-        }
-        std::cerr << "Error while reading from client." << std::endl;
-        shutdown();
-        return;
-    }
+void Client::send(const Message& message) {
+    m_messages.push(message);
 }
 
 Client::~Client() {
-    m_stop = true;
     ::shutdown(m_socketFD, SHUT_RDWR);
     close(m_socketFD);
-    if (std::this_thread::get_id() != m_thread.get_id()) {
-        m_thread.join();
-    } else {
-        m_thread.detach();
-    }
 }
 
 void Client::shutdown() {
@@ -76,6 +24,51 @@ int Client::socketFD() const {
     return m_socketFD;
 }
 
-bool Client::stopped() const {
-    return m_stop;
+void Client::write() {
+    if (!m_messages.empty()) {
+        const auto& message = m_messages.front();
+        int rv = ::send(m_socketFD, message.data() + m_writePosition, message.size() - m_writePosition, 0);
+        if (rv == 0) {
+            shutdown();
+            return;
+        }
+        if (rv > 0) {
+            m_writePosition += rv;
+        }
+        if (m_writePosition == message.size()) {
+            m_messages.pop();
+            m_writePosition = 0;
+        }
+    }
+    if (m_messages.empty()) {
+        m_server->unregisterWrite(m_socketFD);
+    }
+}
+
+void Client::read() {
+    static const std::size_t PrefixSize = 4;
+    int rv = 0;
+    if (m_readPosition < PrefixSize) {
+        rv = recv(m_socketFD, m_sizeBuffer + m_readPosition, PrefixSize - m_readPosition, 0);
+    } else {
+        if (m_readBuffer.empty()) {
+            auto length = intFromArray<uint32_t>(m_sizeBuffer);
+            m_readBuffer.emplace_back(length);
+        }
+        auto& buffer = m_readBuffer[0];
+        rv = recv(m_socketFD, buffer.writeDst() + m_readPosition - PrefixSize,
+                  buffer.size() - m_readPosition - PrefixSize, 0);
+    }
+    if (rv == 0) {
+        shutdown();
+        return;
+    }
+    if (rv > 0) {
+        m_readPosition += rv;
+    }
+    if (!m_readBuffer.empty() && m_readPosition + PrefixSize == m_readBuffer[0].size()) {
+        m_server->newMessage(m_readBuffer[0]);
+        m_readBuffer.clear();
+        m_readPosition = 0;
+    }
 }

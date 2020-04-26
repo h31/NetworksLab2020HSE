@@ -18,20 +18,22 @@ public:
 
     int socketFD() const;
 
-    void send(const Message& message, const std::shared_ptr<Client>& client);
+    void send(const Message& message);
+
+    void read();
+
+    void write();
 
     void shutdown();
-
-    bool stopped() const;
 
 private:
     const int m_socketFD = 0;
     Server* m_server;
-    std::thread m_thread;
-    ThreadPool m_pool{1};
-    volatile bool m_stop = false;
-
-    void run();
+    std::queue<Message> m_messages;
+    char m_sizeBuffer[4]{};
+    std::size_t m_writePosition = 0;
+    std::size_t m_readPosition = 0;
+    std::vector<Message> m_readBuffer;
 };
 
 #endif

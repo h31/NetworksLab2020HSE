@@ -3,6 +3,9 @@
 
 #include <netdb.h>
 #include <list>
+#include <poll.h>
+#include <unordered_map>
+#include <vector>
 #include "Client.h"
 #include "message.h"
 
@@ -16,15 +19,25 @@ public:
 
     void removeClient(const Client* client);
 
+    void unregisterWrite(int socketFD);
+
 private:
     int m_sockFD;
     sockaddr_in m_serverAddress{};
-    std::list<std::shared_ptr<Client>> m_clients;
-    std::mutex m_mutex;
+    std::unordered_map<int, std::shared_ptr<Client>> m_clients{};
+    std::vector<pollfd> m_fds{};
     volatile bool m_stop = false;
     std::thread m_thread;
 
     void run();
+
+    void acceptClients();
+
+    std::vector<std::shared_ptr<Client>> readyReadClients();
+
+    std::vector<std::shared_ptr<Client>> readyWriteClient();
+
+    void registerRead(int socketFD);
 };
 
 #endif

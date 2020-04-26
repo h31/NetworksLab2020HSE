@@ -8,7 +8,7 @@
 
 class Message {
 public:
-    explicit Message(std::size_t size) : m_size(size) {
+    explicit Message(std::size_t size = 0) : m_size(size) {
         m_data = std::shared_ptr<char>(new char[PrefixSize + size], std::default_delete<char[]>());
         auto time = static_cast<uint64_t>(std::time(nullptr));
         auto timeBytes = intToArray(time);
