@@ -78,8 +78,8 @@ static int write_buffer_to_socket(std::vector<uint8_t> &buffer, int socket_fd) {
         int n = write(socket_fd, &buffer[0], buffer.size() - bytes_written);
         if (n > 0) {
             bytes_written += n;
-        } else if (n != EINTR || !stop) { // do not return on SIGINT
-            result = n; // -1
+        } else if (errno != EINTR || !stop) { // do not return on SIGINT (!stop means that it is not SIGINT)
+            result = n;
         }
     }
     return result; // -1 or 0
@@ -147,8 +147,8 @@ void *client_receive_loop(void *client_socket_fd_ptr) {
         if (n > 0) {
             message_buffer.insert(message_buffer.end(), net_buffer, net_buffer + n);
             process_message_buffer(message_buffer, name, authenticated);
-        } else if (n != EINTR || !stop) { // do not stop on SIGINT. This thread will terminate gracefully
-            continue_reading = false;     // after reading EOF from client.
+        } else if (errno != EINTR || !stop) { // do not stop on SIGINT (!stop means that it is not SIGINT) This thread will
+            continue_reading = false;         // terminate gracefully after reading EOF from client.
         }
     }
 
@@ -223,6 +223,11 @@ int main(int argc, char *argv[]) {
     listen(server_socket, 5);
     init_mutexes();
     while (true) {
+        if (stop) {
+            break;
+        }
+        // SIGINT may be received AFTER if(stop) but BEFORE accept. In this case server will not stop immediately but
+        // it is VERY unlikely and user can send SIGINT another time anyway so I believe that it is not a problem.
         int child_fd = accept(server_socket, nullptr, nullptr);
         if (stop) {
             break;
