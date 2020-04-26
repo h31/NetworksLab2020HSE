@@ -72,7 +72,7 @@ static void append_server_msg_to_buffer(std::vector<uint8_t> &buf, std::string &
     buf.insert(buf.end(), text.begin(), text.end());
 }
 
-void process_input_buffer(std::vector<ClientInfo> &clients, int client_num) {
+static void process_input_buffer(std::vector<ClientInfo> &clients, int client_num) {
     ClientInfo &current_client = clients[client_num];
     std::deque<uint8_t> &message_buffer = current_client.input_buffer;
     bool &authenticated = current_client.authenticated;
@@ -111,7 +111,7 @@ void process_input_buffer(std::vector<ClientInfo> &clients, int client_num) {
     }
 }
 
-bool read_from_client(std::vector<pollfd> &fds, std::vector<ClientInfo> &clients, int client_num) {
+static bool read_from_client(std::vector<pollfd> &fds, std::vector<ClientInfo> &clients, int client_num) {
     ClientInfo &current_client = clients[client_num];
     uint8_t bytes[256];
     int n = read(current_client.fd, bytes, 256);
@@ -130,7 +130,7 @@ bool read_from_client(std::vector<pollfd> &fds, std::vector<ClientInfo> &clients
     return closed;
 }
 
-bool write_to_client(ClientInfo &client) {
+static bool write_to_client(ClientInfo &client) {
     int to_send_size = std::min<int>(256, client.output_buffer.size());
     std::vector<uint8_t> to_send(client.output_buffer.begin(), client.output_buffer.begin() + to_send_size);
     int n = write(client.fd, &to_send[0], to_send_size);
@@ -145,7 +145,7 @@ bool write_to_client(ClientInfo &client) {
     return closed;
 }
 
-void accept_client(int server_socket, std::vector<pollfd> &fds, std::vector<ClientInfo> &clients) {
+static void accept_client(int server_socket, std::vector<pollfd> &fds, std::vector<ClientInfo> &clients) {
     int child_fd = accept(server_socket, nullptr, nullptr);
     if (child_fd < 0) {
         std::cerr << "ERROR on accept: " << strerror(errno) << std::endl;
@@ -157,7 +157,7 @@ void accept_client(int server_socket, std::vector<pollfd> &fds, std::vector<Clie
     clients.emplace_back(child_fd);
 }
 
-void split_buffer_to_lines(std::deque<uint8_t> &bytes, std::vector<std::string> &lines) {
+static void split_buffer_to_lines(std::deque<uint8_t> &bytes, std::vector<std::string> &lines) {
     int first_unparsed_byte = 0;
     for (int i = 0; i < bytes.size(); i++) {
         if (bytes[i] == '\n') {
@@ -169,7 +169,7 @@ void split_buffer_to_lines(std::deque<uint8_t> &bytes, std::vector<std::string> 
     bytes.erase(bytes.begin(), bytes.begin() + first_unparsed_byte);
 }
 
-bool read_stdin(std::deque<uint8_t> &stdin_buffer) {
+static bool read_stdin(std::deque<uint8_t> &stdin_buffer) {
     uint8_t bytes[256];
     bool close = false;
     int n = read(STDIN_FILENO, bytes, 256);
@@ -189,7 +189,7 @@ bool read_stdin(std::deque<uint8_t> &stdin_buffer) {
     return close;
 }
 
-void set_to_blocking_mode(int fd) {
+static void set_to_blocking_mode(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) {
         std::cerr << "ERROR getting flags of fd: " << strerror(errno) << std::endl;
@@ -202,7 +202,7 @@ void set_to_blocking_mode(int fd) {
     }
 }
 
-void close_sockets(int server_socket, std::vector<ClientInfo> &clients) {
+static void close_sockets(int server_socket, std::vector<ClientInfo> &clients) {
     for (ClientInfo &client: clients) {
         shutdown(client.fd, SHUT_WR);
         set_to_blocking_mode(client.fd);
@@ -218,8 +218,11 @@ void close_sockets(int server_socket, std::vector<ClientInfo> &clients) {
     close(server_socket);
 }
 
-void main_server_routine(int server_socket) {
+static void main_server_routine(int server_socket) {
+    fcntl(server_socket, F_SETFL, O_NONBLOCK);
     fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+    listen(server_socket, 5);
+
 
     int extra_fds_num = 2;
     std::vector<pollfd> fds(extra_fds_num);
@@ -315,8 +318,6 @@ int main(int argc, char *argv[]) {
         std::cerr << "ERROR on binding: " << strerror(errno) << std::endl;
         return 1;
     }
-    fcntl(server_socket, F_SETFL, O_NONBLOCK);
-    listen(server_socket, 5);
     main_server_routine(server_socket);
 
     return 0;

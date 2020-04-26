@@ -11,6 +11,9 @@
 #include <iomanip>
 #include <csignal>
 #include <atomic>
+#include <fcntl.h>
+#include <poll.h>
+#include <climits>
 
 /*
  * message from server:
@@ -25,9 +28,6 @@ static const int FIXED_PREF_BYTES = OP_BYTES + TIMESTAMP_BYTES + LEN_BYTES;
 static const int AUTH_OP = 0;
 static const int TEXT_OP = 1;
 static const int SERVER_MSG_OP = 2;
-
-static std::atomic<bool> stopped_reading_input(false);
-static std::atomic<bool> socket_closed(false);
 
 static time_t get_time_from_millis(uint64_t millis) {
     auto duration = std::chrono::duration<uint64_t, std::milli>(millis);
@@ -86,65 +86,167 @@ static void process_message_buffer(std::deque<uint8_t> &message_buffer) {
     }
 }
 
-static void *fd_reader_loop(void *fd_ptr) {
-    int socket_fd = *(int *) fd_ptr;
-    std::deque<uint8_t> message_buffer;
-    uint8_t net_buffer[256];
-    int n;
-    while ((n = read(socket_fd, &net_buffer, 256)) > 0) {
-        message_buffer.insert(message_buffer.end(), net_buffer, net_buffer + n);
-        process_message_buffer(message_buffer);
-    }
-
-    if (n < 0) {
-        std::cerr << "error reading from socket: " << std::strerror(errno) << std::endl;
-    }
-
-    std::cout << "closing socket" << std::endl;
-    socket_closed = true;
-    close(socket_fd);
-    if (!stopped_reading_input) {
-        std::cout << "PRESS ENTER TO CLOSE" << std::endl;
-    }
-    return nullptr;
-}
-
-// write may transfer fewer bytes than requested!
-static int write_buffer_to_socket(std::vector<uint8_t> &buffer, int socket_fd) {
-    int bytes_written = 0;
-    int result = 0;
-    while (bytes_written != buffer.size() && result == 0) {
-        int n = write(socket_fd, &buffer[0], buffer.size() - bytes_written);
-        if (n > 0) {
-            bytes_written += n;
-        } else {
-            result = n; // -1
-        }
-    }
-    return result; // -1 or 0
-}
-
-static void append_uint16_to_buffer(std::vector<uint8_t> &buf, uint16_t value) {
+static void append_uint16_to_buffer(std::deque<uint8_t> &buf, uint16_t value) {
     uint16_t network_ordered = htons(value);
     buf.insert(buf.end(),
                reinterpret_cast<uint8_t *>(&network_ordered),
                reinterpret_cast<uint8_t *>(&network_ordered) + 2);
 }
 
-static int write_auth_message_to_socket(std::string &name, int socket_fd) {
-    std::vector<uint8_t> buffer;
-    buffer.push_back(AUTH_OP);
-    append_uint16_to_buffer(buffer, name.length());
-    buffer.insert(buffer.end(), name.begin(), name.end());
-    return write_buffer_to_socket(buffer, socket_fd);
+static void append_auth_message_to_buffer(std::deque<uint8_t> &buf, std::string &name) {
+    buf.push_back(AUTH_OP);
+    append_uint16_to_buffer(buf, name.length());
+    buf.insert(buf.end(), name.begin(), name.end());
 }
 
-static int write_text_message_to_socket(std::string &text, int socket_fd) {
-    std::vector<uint8_t> buffer;
-    buffer.push_back(TEXT_OP);
-    append_uint16_to_buffer(buffer, text.length());
-    buffer.insert(buffer.end(), text.begin(), text.end());
-    return write_buffer_to_socket(buffer, socket_fd);
+static void append_text_message_to_buffer(std::deque<uint8_t> &buf, std::string &text) {
+    buf.push_back(TEXT_OP);
+    append_uint16_to_buffer(buf, text.length());
+    buf.insert(buf.end(), text.begin(), text.end());
+}
+
+static void split_buffer_to_lines(std::deque<uint8_t> &bytes, std::vector<std::string> &lines) {
+    int first_unparsed_byte = 0;
+    for (int i = 0; i < bytes.size(); i++) {
+        if (bytes[i] == '\n') {
+            std::string line(bytes.begin() + first_unparsed_byte, bytes.begin() + i);
+            lines.push_back(line);
+            first_unparsed_byte = i + 1;
+        }
+    }
+    bytes.erase(bytes.begin(), bytes.begin() + first_unparsed_byte);
+}
+
+static bool read_stdin(std::deque<uint8_t> &stdin_buffer, std::deque<uint8_t> &server_output_buffer) {
+    uint8_t bytes[256];
+    bool close = false;
+    int n = read(STDIN_FILENO, bytes, 256);
+    if (n >= 0) {
+        stdin_buffer.insert(stdin_buffer.end(), bytes, bytes + n);
+        std::vector<std::string> lines;
+        split_buffer_to_lines(stdin_buffer, lines);
+        for (std::string &line: lines) {
+            if (line.length() > std::numeric_limits<uint16_t>::max()) {
+                std::cerr << "message is too long" << std::endl;
+            } else if (line == ":q") {
+                close = true;
+            } else {
+                append_text_message_to_buffer(server_output_buffer, line);
+            }
+        }
+    } else {
+        std::cerr << "ERROR reading stdin: " << strerror(errno) << std::endl;
+        close = true;
+    }
+    return close;
+}
+
+static bool read_from_server(int socket_fd, std::deque<uint8_t> &socket_input_buffer) {
+    uint8_t bytes[256];
+    int n = read(socket_fd, bytes, 256);
+    bool closed = false;
+    if (n > 0) {
+        socket_input_buffer.insert(socket_input_buffer.end(), bytes, bytes + n);
+        process_message_buffer(socket_input_buffer);
+    } else if (n == 0) {
+        close(socket_fd);
+        closed = true;
+    } else if (n < 0) {
+        std::cerr << "ERROR reading from server: " << strerror(errno) << std::endl;
+        close(socket_fd);
+        closed = true;
+    }
+    return closed;
+}
+
+static bool write_to_server(int socket_fd, std::deque<uint8_t> &socket_output_buffer) {
+    int to_send_size = std::min<int>(256, socket_output_buffer.size());
+    std::vector<uint8_t> to_send(socket_output_buffer.begin(), socket_output_buffer.begin() + to_send_size);
+    int n = write(socket_fd, &to_send[0], to_send_size);
+    bool closed = false;
+    if (n >= 0) {
+        socket_output_buffer.erase(socket_output_buffer.begin(), socket_output_buffer.begin() + n);
+    } else {
+        std::cerr << "ERROR writing to server: " << strerror(errno) << std::endl;
+        close(socket_fd);
+        closed = true;
+    }
+    return closed;
+}
+
+static void set_to_blocking_mode(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        std::cerr << "ERROR getting flags of fd: " << strerror(errno) << std::endl;
+        return;
+    }
+    flags &= ~O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, flags) < 0) {
+        std::cerr << "ERROR setting socket to non-blocking mode: " << strerror(errno) << std::endl;
+        return;
+    }
+}
+
+static void close_socket(int socket_fd) {
+    shutdown(socket_fd, SHUT_WR);
+    set_to_blocking_mode(socket_fd);
+    uint8_t bytes[256];
+    int n;
+    while ((n = read(socket_fd, bytes, 256)) > 0) {}
+
+    if (n == -1) {
+        std::cerr << "ERROR reading from socket: " << strerror(errno) << std::endl;
+    }
+    close(socket_fd);
+}
+
+static void main_client_routine(int socket_fd, std::string &name) {
+    fcntl(socket_fd, F_SETFL, O_NONBLOCK);
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+
+    std::deque<uint8_t> socket_input_buffer;
+    std::deque<uint8_t> socket_output_buffer;
+    std::deque<uint8_t> stdin_input_buffer;
+
+    std::vector<pollfd> fds(2);
+    fds[0].fd = socket_fd;
+    fds[0].events = POLLIN | POLLOUT;
+    fds[1].fd = STDIN_FILENO;
+    fds[1].events = POLLIN;
+
+    append_auth_message_to_buffer(socket_output_buffer, name);
+    bool socket_already_closed = false;
+    while (true) {
+        int ret = poll(&fds[0], fds.size(), INT_MAX);
+        if (ret < 0) {
+            std::cerr << "ERROR in poll: " << strerror(errno) << std::endl;
+            break;
+        }
+
+        if (fds[1].revents & POLLIN) {
+            if (read_stdin(stdin_input_buffer, socket_output_buffer)) break;
+        }
+
+        if (fds[0].revents & POLLIN) {
+            socket_already_closed = read_from_server(socket_fd, socket_input_buffer);
+            if (socket_already_closed) break;
+        }
+
+        if (fds[0].revents & POLLOUT) {
+            socket_already_closed = write_to_server(socket_fd, socket_output_buffer);
+            if (socket_already_closed) break;
+        }
+
+        fds[1].events = POLLIN;
+        fds[0].events = POLLIN;
+        if (!socket_output_buffer.empty()) {
+            fds[0].events |= POLLOUT;
+        }
+    }
+
+    if (!socket_already_closed) {
+        close_socket(socket_fd);
+    }
 }
 
 static int open_connection(addrinfo *addrs, int &sockfd) {
@@ -171,7 +273,6 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN); // handling error codes from read/write is better
 
     int socket_fd = -1;
-    int result;
     int err;
 
     if (argc < 4) {
@@ -207,36 +308,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    pthread_t client_handler;
-    pthread_create(&client_handler, nullptr, fd_reader_loop, &socket_fd);
+    main_client_routine(socket_fd, name);
 
-    result = write_auth_message_to_socket(name, socket_fd);
-    if (result != 0) {
-        std::cerr << "cannot write message to socket: " << strerror(errno) << std::endl;
-    }
-
-    while (result == 0) {
-        std::string msg;
-        std::getline(std::cin, msg);
-
-        if (socket_closed || msg == ":q") {
-            break;
-        }
-        if (msg.length() > std::numeric_limits<uint16_t>::max()) {
-            std::cerr << "message is too long" << std::endl;
-            continue;
-        }
-        result = write_text_message_to_socket(msg, socket_fd);
-        if (result < 0) {
-            std::cerr << "cannot write message to socket: " << strerror(errno) << std::endl;
-        }
-    }
-
-    stopped_reading_input = true;
-    if (!socket_closed) {
-        shutdown(socket_fd, SHUT_WR);
-    }
-
-    pthread_join(client_handler, nullptr);
     return 0;
 }
