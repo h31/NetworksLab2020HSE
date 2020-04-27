@@ -5,7 +5,6 @@
 #ifndef SERVER_SERVER_H
 #define SERVER_SERVER_H
 
-#include "../Message.h"
 #include <memory>
 #include <unistd.h>
 #include <cstring>
@@ -13,10 +12,12 @@
 #include <netinet/in.h>
 #include <iomanip>
 #include <vector>
-#include <thread>
 #include <mutex>
 #include <iostream>
+#include <algorithm>
+#include <sys/poll.h>
 #include "Client.h"
+#include "Message.h"
 
 class Client;
 
@@ -32,19 +33,23 @@ public:
 
     ~Server();
 
+    void removeWriteRegistration(Client *client);
+
 private:
     int socketDescriptor;
     sockaddr_in serverAddress{};
-    std::vector<Client *> clients;
 
-    std::mutex clientMutex;
-    pthread_mutex_t *broadcast_mutex = new pthread_mutex_t();
+    int numberOfAdditionalDescriptors = 1;
+    std::vector<Client *> clients;
+    std::vector<pollfd> pollDescriptors{};
+
     volatile bool working = true;
-    std::thread clientAcceptThread;
 
     void clientAccepting();
 
     void leave(const char *message);
+
+    void routine();
 };
 
 

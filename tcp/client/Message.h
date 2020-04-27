@@ -2,8 +2,8 @@
 // Created by ralsei on 20.04.2020.
 //
 
-#ifndef SERVER_MESSAGE_H
-#define SERVER_MESSAGE_H
+#ifndef CLIENT_MESSAGE_H
+#define CLIENT_MESSAGE_H
 
 #include <memory>
 #include <unistd.h>
@@ -71,4 +71,4 @@ private:
 };
 
 
-#endif //SERVER_MESSAGE_H
+#endif //CLIENT_MESSAGE_H

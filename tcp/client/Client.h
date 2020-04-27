@@ -5,7 +5,7 @@
 #ifndef CLIENT_CLIENT_H
 #define CLIENT_CLIENT_H
 
-#include "../Message.h"
+#include "Message.h"
 #include <memory>
 #include <unistd.h>
 #include <cstring>

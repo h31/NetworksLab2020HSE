@@ -5,68 +5,55 @@
 #include "Client.h"
 
 Client::Client(int socketDescriptor, Server *server) : socketDescriptor(socketDescriptor), server(server) {
-    pthread_mutex_init(messagesQueueMutex, nullptr);
-    pthread_cond_init(queueNotEmpty, nullptr);
-
-    readFromServerThread = std::thread(&Client::readingMessages, this);
-    broadcastToAllClientsThread = std::thread(&Client::writingMessages, this);
 }
 
 void Client::readingMessages() {
-    while (isWorking()) {
-        auto message = new Message(&interrupted);
-        bool failed = message->readFromClientSocket(socketDescriptor);
+    if (currentMessage == nullptr) {
+        currentMessage = new Message();
+    }
 
-        if (failed) {
-            server->removeClient(this);
-            return;
-        }
+    auto failed = currentMessage->readFromClientSocket(socketDescriptor);
 
-        submitNewMessageToQueue(message);
+    if (failed) {
+        server->removeClient(this);
+        return;
+    }
+
+    if (currentMessage->fullyRead()) {
+        server->broadcastToAllClients(currentMessage);
+
+        delete currentMessage;
+        currentMessage = new Message();
     }
 }
 
 void Client::writingMessages() {
-    while (isWorking()) {
-        pthread_mutex_lock(messagesQueueMutex);
-        while (isWorking() && messagesToSend.empty()) {
-            pthread_cond_wait(queueNotEmpty, messagesQueueMutex);
-        }
-
-        Message *messageToSend = messagesToSend.front();
-        messagesToSend.pop();
-        pthread_mutex_unlock(messagesQueueMutex);
-
-        server->broadcastToAllClients(messageToSend);
-        delete messageToSend;
+    Message *messageToSend = messagesToSend.front();
+    auto result = messageToSend->writeToClientSocket(socketDescriptor);
+    if (result < 0) {
+        server->removeClient(this);
+        return;
     }
+
+    if (messageToSend->fullyRead()) {
+        messagesToSend.pop();
+
+        if (messagesToSend.empty()) {
+            server->removeWriteRegistration(this);
+        }
+    }
+
+    delete messageToSend;
 }
 
 void Client::submitNewMessageToQueue(Message *message) {
-    pthread_mutex_lock(messagesQueueMutex);
-
     messagesToSend.push(message);
-    if (messagesToSend.size() == 1) {
-        pthread_cond_broadcast(queueNotEmpty);
-    }
-
-    pthread_mutex_unlock(messagesQueueMutex);
 }
 
 Client::~Client() {
-    pthread_mutex_destroy(messagesQueueMutex);
-    pthread_cond_destroy(queueNotEmpty);
-
     shutdown(socketDescriptor, SHUT_RDWR);
     close(socketDescriptor);
-    interrupted = true;
-
-    readFromServerThread.join();
-    broadcastToAllClientsThread.join();
-}
-
-bool Client::isWorking() const {
-    return !interrupted;
+    delete currentMessage;
 }
 
 

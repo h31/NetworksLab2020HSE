@@ -150,6 +150,33 @@ Client.cpp.s:
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Client.cpp.s
 .PHONY : Client.cpp.s
 
+Message.o: Message.cpp.o
+
+.PHONY : Message.o
+
+# target to build an object file
+Message.cpp.o:
+	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Message.cpp.o
+.PHONY : Message.cpp.o
+
+Message.i: Message.cpp.i
+
+.PHONY : Message.i
+
+# target to preprocess a source file
+Message.cpp.i:
+	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Message.cpp.i
+.PHONY : Message.cpp.i
+
+Message.s: Message.cpp.s
+
+.PHONY : Message.s
+
+# target to generate assembly for a file
+Message.cpp.s:
+	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Message.cpp.s
+.PHONY : Message.cpp.s
+
 Server.o: Server.cpp.o
 
 .PHONY : Server.o
@@ -176,33 +203,6 @@ Server.s: Server.cpp.s
 Server.cpp.s:
 	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/Server.cpp.s
 .PHONY : Server.cpp.s
-
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.o: home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.o
-
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.o
-
-# target to build an object file
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.o:
-	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.o
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.o
-
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.i: home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.i
-
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.i
-
-# target to preprocess a source file
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.i:
-	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.i
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.i
-
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.s: home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.s
-
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.s
-
-# target to generate assembly for a file
-home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.s:
-	$(MAKE) -f CMakeFiles/server.dir/build.make CMakeFiles/server.dir/home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.s
-.PHONY : home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.cpp.s
 
 main.o: main.cpp.o
 
@@ -243,12 +243,12 @@ help:
 	@echo "... Client.o"
 	@echo "... Client.i"
 	@echo "... Client.s"
+	@echo "... Message.o"
+	@echo "... Message.i"
+	@echo "... Message.s"
 	@echo "... Server.o"
 	@echo "... Server.i"
 	@echo "... Server.s"
-	@echo "... home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.o"
-	@echo "... home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.i"
-	@echo "... home/ralsei/AAvazhnoe/CLionProjects/NetworksLab2020HSE/tcp/Message.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
