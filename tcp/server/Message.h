@@ -50,6 +50,7 @@ private:
     int32_t* positions = nullptr;
     uint8_t* currentIntBytes = nullptr;
 
+    uint32_t receivedLength = 0;
 
     bool readFromSocket(int socketDescriptor, int low);
 

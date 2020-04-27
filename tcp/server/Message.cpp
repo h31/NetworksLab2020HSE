@@ -5,7 +5,6 @@
 #include "Message.h"
 
 bool Message::readFromSocket(int socketDescriptor, int low) {
-    uint32_t receivedLength;
     int diff = 0;
 
     if (currentPosition < positions[low]) {
@@ -28,7 +27,7 @@ bool Message::readFromSocket(int socketDescriptor, int low) {
             positions[low + 3] = positions[low + 2] + messageLength;
         }
     } else if (currentPosition < positions[low + 2]) {
-        int left = positions[low + 2] - 1 - currentPosition;
+        int left = positions[low + 2] - currentPosition;
 
         diff = read(socketDescriptor, userNickname, left);
 
@@ -36,7 +35,7 @@ bool Message::readFromSocket(int socketDescriptor, int low) {
             message = initCharArray(messageLength);
         }
     } else if (currentPosition < positions[low + 3]) {
-        int left = positions[low + 3] - 1 - currentPosition;
+        int left = positions[low + 3] - currentPosition;
 
         diff = read(socketDescriptor, message, left);
     }
@@ -287,4 +286,5 @@ Message::Message(uint32_t userNicknameLength, uint8_t *userNickname, uint32_t me
 
 Message::Message(Message *other) : Message(other->userNicknameLength, other->userNickname, other->messageLength,
                                            other->message) {
+    this->time = other->time;
 }

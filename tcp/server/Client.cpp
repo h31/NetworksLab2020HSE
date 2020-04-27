@@ -41,9 +41,9 @@ void Client::writingMessages() {
         if (messagesToSend.empty()) {
             server->removeWriteRegistration(this);
         }
-    }
 
-    delete messageToSend;
+        delete messageToSend;
+    }
 }
 
 void Client::submitNewMessageToQueue(Message *message) {
