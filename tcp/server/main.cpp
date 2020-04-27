@@ -9,7 +9,6 @@
 
 #include <string.h>
 #include <string>
-#include <pthread.h>
 #include <vector>
 #include <ctime>
 #include <atomic>
@@ -122,17 +121,35 @@ void server_loop(int server_sockfd) {
     serverfd.events = POLLIN;
     fds.push_back(serverfd);
 
+    // add pollfd for stdin
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
+    pollfd stdinfd;
+    stdinfd.fd = STDIN_FILENO;
+    stdinfd.events = POLLIN;
+    fds.push_back(stdinfd);
+    bool is_closed = false;
+
     while (true) {
         int res = poll(fds.data(), fds.size(), -1);
         if (res < 0) {
             perror("ERROR while calling poll");
             exit(1);
         }
+
+        if (fds[1].revents & POLLIN) {
+            char c = getc(stdin);
+            if (c == EOF) {
+                is_closed = true;
+                break;
+            }
+        }
+
         if (fds[0].revents & POLLIN) {
             accept_new_client(server_sockfd, fds);
         }
-        for (size_t i = 1; i < fds.size(); i++) {
-            Client &client = clients[i - 1];
+
+        for (size_t i = 2; i < fds.size(); i++) {
+            Client &client = clients[i - 2];
             if (fds[i].revents & POLLIN) {
                 process_client(client);
             }
@@ -140,16 +157,23 @@ void server_loop(int server_sockfd) {
                 write_client_output_buffer(client);
             }
         }
-        for (size_t i = 1; i < fds.size(); i++) {
-            if (!clients[i - 1].output_buffer.empty()) {
+
+        for (size_t i = 2; i < fds.size(); i++) {
+            if (!clients[i - 2].output_buffer.empty()) {
                 fds[i].events = POLLIN | POLLOUT;
             } else {
                 fds[i].events = POLLIN;
             }
         }
     }
+    close(server_sockfd);
+    char buffer[256];
+    for (Client &client : clients) {
+        shutdown(client.sockfd, SHUT_WR);
+        while (read(client.sockfd, buffer, 255) > 0);
+        close(client.sockfd);
+    }
 }
-
 
 int main(int argc, char *argv[]) {
     int sockfd;
