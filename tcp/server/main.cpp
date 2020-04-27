@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fcntl.h>
+#include <poll.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -13,11 +15,17 @@
 #include <atomic>
 
 std::vector<pthread_t*> threads_to_join;
-pthread_mutex_t clients_mutex;
 std::vector<int> clients_sockets;
 
-void send_message_to_all_clients(const char *text_message, const char *username) {
-    pthread_mutex_lock(&clients_mutex);
+struct Client {
+    int sockfd;
+    std::vector<char> output_buffer;
+};
+
+std::vector<Client> clients;
+
+// writes message to output buffers of all the clients and add POLLOUT to their events
+void write_message_to_all_output_buffers(const char *text_message, const char *username) {
 
     uint32_t message_length = strlen(text_message);
     uint32_t username_length = strlen(username);
@@ -30,76 +38,116 @@ void send_message_to_all_clients(const char *text_message, const char *username)
     buffer.insert(buffer.end(), text_message, text_message + message_length);
     buffer.insert(buffer.end(), username, username + username_length);
 
-    for (int client_socket : clients_sockets) {
-        int n = write(client_socket, buffer.data(), buffer.size());
+    for (Client &client : clients) {
+        client.output_buffer.insert(client.output_buffer.end(), buffer.begin(), buffer.end());
+    }
+}
+
+// reads the message from the client and writes it to output buffers of all the clients
+void process_client(Client &client) {
+    char buffer[256];
+    bzero(buffer, 256);
+    std::vector<char> client_message;
+    static const int header_size = 2 * sizeof (uint32_t);
+
+    // read header to get sizes of the message and the username
+    while (client_message.size() < header_size) {
+        int n = read(client.sockfd, buffer, 255);
         if (n < 0) {
-            perror("ERROR writing to socket");
+            perror("ERROR reading from socket");
             exit(1);
         }
-
+        client_message.insert(client_message.end(), buffer, buffer + n);
     }
-    pthread_mutex_unlock(&clients_mutex);
+    uint32_t message_length = *((uint32_t*) client_message.data());
+    uint32_t username_length = *((uint32_t*) &client_message.data()[sizeof(uint32_t)]);
+
+    // read the rest of the message
+    while (client_message.size() < header_size + message_length + username_length) {
+        int n = read(client.sockfd, buffer, 255);
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+        client_message.insert(client_message.end(), buffer, buffer + n);
+    }
+    std::vector<char> text_message = std::vector<char>(client_message.begin() + header_size,
+                                                       client_message.begin() + header_size + message_length);
+    text_message.push_back('\0');
+    std::vector<char> username = std::vector<char>(client_message.begin() + header_size + message_length,
+                                                   client_message.begin() + header_size + message_length + username_length);
+    username.push_back('\0');
+
+    printf("[%s] %s\n", username.data(), text_message.data());
+
+    write_message_to_all_output_buffers(text_message.data(), username.data());
+
 }
 
-void *client_process(void* arg) {
-    char buffer[256];
-    int newsockfd = *(int *)arg;
-    delete (int*) arg;
-    while (true) {
-        bzero(buffer, 256);
-        std::vector<char> client_message;
-        static const int header_size = 2 * sizeof (uint32_t);
-        while (client_message.size() < header_size) {
-            int n = read(newsockfd, buffer, 255);
-            if (n < 0) {
-                perror("ERROR reading from socket");
-                exit(1);
-            }
-            client_message.insert(client_message.end(), buffer, buffer + n);
-        }
-        uint32_t message_length = *((uint32_t*) client_message.data());
-        uint32_t username_length = *((uint32_t*) &client_message.data()[sizeof(uint32_t)]);
-
-        while (client_message.size() < header_size + message_length + username_length) {
-            int n = read(newsockfd, buffer, 255);
-            if (n < 0) {
-                perror("ERROR reading from socket");
-                exit(1);
-            }
-            client_message.insert(client_message.end(), buffer, buffer + n);
-        }
-        std::vector<char> text_message = std::vector<char>(client_message.begin() + header_size,
-                                                           client_message.begin() + header_size + message_length);
-        text_message.push_back('\0');
-        std::vector<char> username = std::vector<char>(client_message.begin() + header_size + message_length,
-                                                       client_message.begin() + header_size + message_length + username_length);
-        username.push_back('\0');
-
-        printf("[%s] %s\n", username.data(), text_message.data());
-
-        send_message_to_all_clients(text_message.data(), username.data());
-    }
-    return nullptr;
-}
-
-// accepts new client sockets
-void server_loop(int sockfd) {
+void accept_new_client(int server_sockfd, std::vector<pollfd> &fds) {
     sockaddr_in cli_addr;
-
     unsigned int clilen = sizeof(cli_addr);
-    int *newsockfd = new int(0);
-    *newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-
-    if (*newsockfd < 0) {
+    int newsockfd = accept(server_sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    if (newsockfd < 0) {
         perror("ERROR on accept");
         exit(1);
     }
-    pthread_mutex_lock(&clients_mutex);
-    clients_sockets.push_back(*newsockfd);
-    pthread_mutex_unlock(&clients_mutex);
-    pthread_t *thread = new pthread_t();
-    threads_to_join.push_back(thread);
-    pthread_create(thread, nullptr, client_process, (void*) newsockfd);
+    fcntl(newsockfd, F_SETFL, O_NONBLOCK);
+    pollfd newfd;
+    newfd.fd = newsockfd;
+    newfd.events = POLLIN;
+    fds.push_back(newfd);
+    Client client;
+    client.sockfd = newsockfd;
+    clients.push_back(client);
+}
+
+void write_client_output_buffer(Client &client) {
+    int n = write(client.sockfd, client.output_buffer.data(), client.output_buffer.size());
+    if (n < 0) {
+        perror("ERROR on write");
+        exit(1);
+    } else {
+        client.output_buffer.erase(client.output_buffer.begin(), client.output_buffer.begin() + n);
+    }
+}
+
+// main server method
+void server_loop(int server_sockfd) {
+    std::vector<pollfd> fds;
+
+    // add pollfd for server to accept new clients
+    pollfd serverfd;
+    serverfd.fd = server_sockfd;
+    serverfd.events = POLLIN;
+    fds.push_back(serverfd);
+
+    while (true) {
+        int res = poll(fds.data(), fds.size(), -1);
+        if (res < 0) {
+            perror("ERROR while calling poll");
+            exit(1);
+        }
+        if (fds[0].revents & POLLIN) {
+            accept_new_client(server_sockfd, fds);
+        }
+        for (size_t i = 1; i < fds.size(); i++) {
+            Client &client = clients[i - 1];
+            if (fds[i].revents & POLLIN) {
+                process_client(client);
+            }
+            if (fds[i].revents & POLLOUT) {
+                write_client_output_buffer(client);
+            }
+        }
+        for (size_t i = 1; i < fds.size(); i++) {
+            if (!clients[i - 1].output_buffer.empty()) {
+                fds[i].events = POLLIN | POLLOUT;
+            } else {
+                fds[i].events = POLLIN;
+            }
+        }
+    }
 }
 
 
@@ -133,10 +181,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    fcntl(sockfd, F_SETFL, O_NONBLOCK);
     listen(sockfd, 5);
-    while (true) {
-        server_loop(sockfd);
-    }
+    server_loop(sockfd);
+
     for (pthread_t *thread : threads_to_join) {
         pthread_join(*thread, nullptr);
         delete thread;
