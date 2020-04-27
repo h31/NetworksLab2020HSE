@@ -5,6 +5,8 @@
 #include <string>
 #include <atomic>
 #include <thread>
+#include <netinet/in.h>
+#include <netdb.h>
 #include "socket_io.h"
 class client {
 
@@ -13,7 +15,7 @@ public:
 
 private:
     std::string name;
-    int socket_fd;
+    int fd;
     socket_io io;
     std::thread  read_thread;
     std::thread  write_thread;
@@ -22,18 +24,55 @@ private:
 
     void write_loop();
 
-    void shutdown();
-
 public:
-    client(const char* name, int socket_fd) :   running(true),
-                                                name(name),
-                                                socket_fd(socket_fd),
-                                                io(socket_fd),
-                                                read_thread(&client::read_loop, this),
-                                                write_thread(&client::write_loop, this) {}
+    client(const char* name, const char* hostname, const char* port) : running(false), name(name) {
+        int err;
+        struct addrinfo hints = {}, *addrs;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        err = getaddrinfo(hostname, port, &hints, &addrs); // gethostbyname is deprecated
+        if (err != 0)
+        {
+            std::cout << "Error on getaddrino:" << gai_strerror(err);
+            exit(1);
+        }
+
+        for (struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next)
+        {
+            fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+            if (fd == -1)
+            {
+                err = errno;
+                break;
+            }
+            if (connect(fd, addr->ai_addr, addr->ai_addrlen) == 0)
+            {
+                break;
+            }
+            err = errno;
+            close(fd);
+            fd = -1;
+        }
+
+        freeaddrinfo(addrs);
+
+        if (fd == -1)
+        {
+            std::cout << "Error on freeaddrino:" << strerror(err);
+            exit(1);
+        }
+
+        io = socket_io(fd);
+    }
+
+    void start();
+
+    void stop();
 
     ~client() {
-        shutdown();
+        stop();
     }
 };
 

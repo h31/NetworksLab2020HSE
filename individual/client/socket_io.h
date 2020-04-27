@@ -9,6 +9,8 @@ private:
     int socket_fd;
 
 public:
+    socket_io() {}
+
     socket_io(int socket_fd) : socket_fd(socket_fd) {}
 
     int32_t read_bytes(unsigned int total_bytes, char* buffer) const;

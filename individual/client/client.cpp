@@ -65,7 +65,18 @@ void client::write_loop() {
     }
 }
 
-void client::shutdown() {
-    read_thread.join();
-    write_thread.join();
+void client::stop() {
+    if (running.exchange(false)) {
+        read_thread.join();
+        write_thread.join();
+    }
+}
+
+void client::start() {
+    if (running.exchange(true)) {
+        std::cout << "Client has already started on socket:" << fd << std::endl;
+        return;
+    }
+    read_thread = std::thread(&client::read_loop, this);
+    write_thread = std::thread(&client::write_loop, this);
 }

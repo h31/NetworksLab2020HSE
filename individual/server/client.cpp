@@ -2,8 +2,11 @@
 #include "client.h"
 
 int client::read() {
-    std::cout << "Read message from client on socket:" << fd.fd << std::endl;
     int nread = input.read(fd.fd);
+
+    if (nread > 0) {
+        std::cout << "Read " << nread << " bytes from client on socket:" << fd.fd << std::endl;
+    }
     return nread;
 }
 
@@ -37,6 +40,9 @@ int client::write() {
     int nwrite = output.front().write(fd.fd);
     if (output.front().full()) {
         output.pop();
+        if (output.empty()) {
+            fd.events = POLLIN;
+        }
     }
     return nwrite;
 }

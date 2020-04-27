@@ -4,15 +4,6 @@
 #include <stropts.h>
 #include "server.h"
 
-const int ON = 1;
-
-void server::start() {
-    if (running.exchange(true)) {
-        std::cout << "Server has already started on socket:" << accept_fd.fd << " port:" <<  port << std::endl;
-    }
-    loop_thread = std::thread(&server::loop, this);
-}
-
 void server::loop() {
     std::cout << "Start server on socket:" << accept_fd.fd << " port:" << port << std::endl;
 
@@ -60,14 +51,12 @@ void server::accept_clients() {
             std::cerr << "Error on switching client socket" << fd << "to non-blocking mode" << std::endl;
             close(fd);
         }
-        std::cout << "Accept client on socket:" << fd << std::endl;
         clients[fd] = std::make_shared<client>(fd, this);
     }
 }
 
 void server::remove_client(int fd) {
     if (clients.find(fd) != clients.end()) {
-        std::cout << "Remove client on socket:" << fd << std::endl;
         clients.erase(fd);
     }
 }
@@ -106,4 +95,12 @@ void server::stop() {
         close(accept_fd.fd);
         loop_thread.join();
     }
+}
+
+void server::start() {
+    if (running.exchange(true)) {
+        std::cout << "Server has already started on socket:" << accept_fd.fd << " port:" <<  port << std::endl;
+        return;
+    }
+    loop_thread = std::thread(&server::loop, this);
 }
