@@ -13,9 +13,6 @@
 #include <ctime>
 #include <atomic>
 
-std::vector<pthread_t*> threads_to_join;
-std::vector<int> clients_sockets;
-
 struct Client {
     int sockfd;
     std::vector<char> output_buffer;
@@ -111,6 +108,16 @@ void write_client_output_buffer(Client &client) {
     }
 }
 
+void set_clients_events(std::vector<pollfd> &fds) {
+    for (size_t i = 2; i < fds.size(); i++) {
+        if (!clients[i - 2].output_buffer.empty()) {
+            fds[i].events = POLLIN | POLLOUT;
+        } else {
+            fds[i].events = POLLIN;
+        }
+    }
+}
+
 // main server method
 void server_loop(int server_sockfd) {
     std::vector<pollfd> fds;
@@ -120,6 +127,7 @@ void server_loop(int server_sockfd) {
     serverfd.fd = server_sockfd;
     serverfd.events = POLLIN;
     fds.push_back(serverfd);
+    const int server_idx = 0;
 
     // add pollfd for stdin
     fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
@@ -127,7 +135,7 @@ void server_loop(int server_sockfd) {
     stdinfd.fd = STDIN_FILENO;
     stdinfd.events = POLLIN;
     fds.push_back(stdinfd);
-    bool is_closed = false;
+    const int stdin_idx = 1;
 
     while (true) {
         int res = poll(fds.data(), fds.size(), -1);
@@ -136,15 +144,14 @@ void server_loop(int server_sockfd) {
             exit(1);
         }
 
-        if (fds[1].revents & POLLIN) {
+        if (fds[stdin_idx].revents & POLLIN) {
             char c = getc(stdin);
             if (c == EOF) {
-                is_closed = true;
                 break;
             }
         }
 
-        if (fds[0].revents & POLLIN) {
+        if (fds[server_idx].revents & POLLIN) {
             accept_new_client(server_sockfd, fds);
         }
 
@@ -158,14 +165,10 @@ void server_loop(int server_sockfd) {
             }
         }
 
-        for (size_t i = 2; i < fds.size(); i++) {
-            if (!clients[i - 2].output_buffer.empty()) {
-                fds[i].events = POLLIN | POLLOUT;
-            } else {
-                fds[i].events = POLLIN;
-            }
-        }
+        set_clients_events(fds);
+
     }
+
     close(server_sockfd);
     char buffer[256];
     for (Client &client : clients) {
@@ -208,11 +211,6 @@ int main(int argc, char *argv[]) {
     fcntl(sockfd, F_SETFL, O_NONBLOCK);
     listen(sockfd, 5);
     server_loop(sockfd);
-
-    for (pthread_t *thread : threads_to_join) {
-        pthread_join(*thread, nullptr);
-        delete thread;
-    }
     close(sockfd);
     return 0;
 }
