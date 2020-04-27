@@ -153,6 +153,7 @@ void poll_loop() {
         for (auto &client : clients) {
             fds[cur].fd = client.descriptor;
             fds[cur].events = POLLIN;
+            cur++;
         }
         clients_mutex.unlock();
         int ready = poll(fds, clients_count, 5000); // every 5 seconds we should refresh clients
@@ -243,8 +244,8 @@ int main(int argc, char *argv[]) {
         } else {
             clients_mutex.lock();
             clients.emplace_back(client_socket);
-            clients_mutex.unlock();
             clients_condition.notify_all();
+            clients_mutex.unlock();
             printf("Connected %d\n", client_socket);
             fflush(stdout);
         }
