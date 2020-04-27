@@ -13,33 +13,92 @@
 #include <algorithm>
 #include <signal.h>
 #include <map>
+#include <condition_variable>
+#include <set>
+#include <poll.h>
+#include <iostream>
+
+class Client;
 
 std::atomic_bool is_running;
 std::atomic_int accept_file_descriptor;
 std::mutex clients_mutex;
-std::vector<int> clients_descriptors;
-std::map<int, std::string> client_nickname;
+std::condition_variable_any clients_condition;
+std::vector<Client> clients;
+std::mutex clients_channel_mutex;
+std::condition_variable_any clients_channel_condition;
+std::string clients_channel;
+
+class Client {
+public:
+    int descriptor = -1;
+    bool is_nickname_set = false;
+    std::string nickname = "";
+    std::mutex channel_mutex;
+    std::string in_channel = "";
+
+    Client(int socket) {
+        descriptor = socket;
+    }
+
+    Client(const Client &other) {
+        descriptor = other.descriptor;
+        is_nickname_set = other.is_nickname_set;
+        nickname = other.nickname;
+        in_channel = other.in_channel;
+    }
+
+    void recieve_message(std::string message) {
+        channel_mutex.lock();
+        in_channel += message;
+        clients_condition.notify_all();
+        channel_mutex.unlock();
+    }
+
+    void process() {
+        // we can create new thread to process in_channel update, but we do it inplace.
+        while (true) {
+            channel_mutex.lock();
+            if (in_channel.size() >= 4) {
+                uint32_t length = ntohl(*(uint32_t *) in_channel.data());
+                if (in_channel.size() >= length + 4) {
+                    if (!is_nickname_set) {
+                        is_nickname_set = true;
+                        nickname = in_channel.substr(4, length);
+                    } else {
+                        time_t rawtime;
+                        struct tm *timeinfo;
+                        char buffer[80];
+
+                        time(&rawtime);
+                        timeinfo = localtime(&rawtime);
+
+                        strftime(buffer, 80, "%H:%M", timeinfo);
+                        std::string broadcast_message =
+                                "<" + std::string(buffer) + "> " + " [" + nickname + "]: " +
+                                in_channel.substr(4, length) + "\n";
+
+                        clients_channel_mutex.lock();
+                        clients_channel += broadcast_message;
+                        clients_channel_condition.notify_all();
+                        clients_channel_mutex.unlock();
+                    }
+                    in_channel.erase(0, length + 4);
+                    channel_mutex.unlock();
+                } else {
+                    channel_mutex.unlock();
+                    return;
+                }
+            } else {
+                channel_mutex.unlock();
+                return;
+            }
+        }
+    }
+};
 
 void sigint_handler_callback(int signum) {
     is_running = false;
-}
-
-int readn(int fd, char *buf, int count) {
-    int read_count = 0;
-    while (count != 0) {
-        int n = read(fd, buf, count);
-        read_count += n;
-        if (n < 0) {
-            perror("ERROR reading from client_socket");
-            return n;
-        } else if (n == 0) {
-            perror("ERROR EOF found");
-            return n;
-        }
-        count -= n;
-        buf += n;
-    }
-    return read_count;
 }
 
 int writen(int fd, const char *buf, int len) {
@@ -57,79 +116,80 @@ int writen(int fd, const char *buf, int len) {
     return count;
 }
 
-std::pair<std::string, bool> read_message(int client_file_descriptor) {
-    char length_buf[4];
-    bzero(length_buf, 4);
-    int n = readn(client_file_descriptor, length_buf, 4);
-    if (n == 0) {
-        perror("READ 0 bytes");
-        return {"", false};
+void process_loop() {
+    while (is_running) {
+        clients_mutex.lock();
+        for (auto &client : clients) {
+            client.process();
+        }
+        clients_condition.wait(clients_mutex);
+        clients_mutex.unlock();
     }
-    uint32_t length = ntohl(*(uint32_t *) length_buf);
-    printf("READ %d length\n", length);
-    if (length == 0) {
-        return {"", true};
-    }
-    std::string message;
-    message.resize(length);
-    n = readn(client_file_descriptor, &message[0], length); // dangerous usage of &message[0]
-    if (n == 0) {
-        perror("READ 0 bytes");
-        return {"", false};
-    }
-    return {message, true};
 }
 
-void client_loop(int client_file_descriptor) {
-    bool is_nickname_set = false;
+void write_loop() {
     while (is_running) {
-        auto res = read_message(client_file_descriptor);
-        auto message = res.first;
-
         clients_mutex.lock();
-        if (!is_nickname_set) {
-            client_nickname[client_file_descriptor] = message;
-            is_nickname_set = true;
-            printf("Nickname for %d: set: %s\n", client_file_descriptor, message.c_str());
-            clients_mutex.unlock();
-            continue;
-        }
-        printf("Got message from %d: %s\n", client_file_descriptor, message.c_str());
-        fflush(stdout);
-        message = "MESSAGE FROM " + std::to_string(client_file_descriptor) + "(" +
-                  client_nickname[client_file_descriptor] + "): " + message;
-
-        time_t rawtime;
-        struct tm *timeinfo;
-        char buffer[80];
-
-        time(&rawtime);
-        timeinfo = localtime(&rawtime);
-
-        strftime(buffer, 80, "%H:%M", timeinfo);
-        std::string broadcast_message =
-                "<" + std::string(buffer) + "> " + " [" + client_nickname[client_file_descriptor] + "]: " +
-                message + "\n";
-        for (auto client_fd : clients_descriptors) {
-            int n = writen(client_fd, broadcast_message.c_str(), broadcast_message.size());
-            if (n < 0) {
-                perror("ERROR writing to socket");
-                exit(1);
+        clients_channel_mutex.lock();
+        if (!clients_channel.empty()) {
+            for (auto &client : clients) {
+                writen(client.descriptor, clients_channel.data(), clients_channel.size());
             }
+            clients_mutex.unlock();
+            clients_channel.clear();
         }
         clients_mutex.unlock();
-        if (!res.second) {
-            break;
+        clients_channel_condition.wait(clients_channel_mutex);
+        clients_channel_mutex.unlock();
+    }
+}
+
+void poll_loop() {
+    while (is_running) {
+        clients_mutex.lock();
+        int clients_count = clients.size();
+        pollfd *fds = new pollfd[clients.size()];
+        int cur = 0;
+        for (auto &client : clients) {
+            fds[cur].fd = client.descriptor;
+            fds[cur].events = POLLIN;
+        }
+        clients_mutex.unlock();
+        int ready = poll(fds, clients_count, 5000); // every 5 seconds we should refresh clients
+        if (ready == -1) {
+            perror("poll error");
+            is_running = false;
+            exit(1);
+        }
+        if (ready != 0) {
+            for (int i = 0; i < clients_count; ++i) {
+                if (fds[cur].revents & POLLIN) {
+                    char buffer[256];
+                    bzero(buffer, 256);
+                    int n = read(fds[cur].fd, buffer, 255);
+                    if(n < 0) {
+                        perror("read error");
+                        exit(1);
+                    }
+                    if(n == 0) {
+                        perror("TODO read 0");
+                        exit(1);
+                    }
+                    printf("Read %d bytes from %d\n", n, fds[cur].fd);
+                    fflush(stdout);
+                    std::string message(buffer, n);
+                    clients_mutex.lock();
+                    for (auto &client : clients) {
+                        if (client.descriptor == fds[cur].fd) {
+                            client.recieve_message(message);
+                            break;
+                        }
+                    }
+                    clients_mutex.unlock();
+                }
+            }
         }
     }
-    printf("Close connection with %d", client_file_descriptor);
-    fflush(stdout);
-    close(client_file_descriptor);
-    clients_mutex.lock();
-    clients_descriptors.erase(
-            std::find(clients_descriptors.begin(), clients_descriptors.end(), client_file_descriptor));
-    client_nickname.erase(client_file_descriptor);
-    clients_mutex.unlock();
 }
 
 int main(int argc, char *argv[]) {
@@ -170,7 +230,10 @@ int main(int argc, char *argv[]) {
 
     listen(accept_file_descriptor, 5);
 
-    std::vector<std::thread> clients;
+    std::thread poll_thread(poll_loop);
+    std::thread process_thread(process_loop);
+    std::thread write_thread(write_loop);
+
     while (is_running) {
         sockaddr_in client_address;
         unsigned int client_length = sizeof(client_address);
@@ -179,16 +242,12 @@ int main(int argc, char *argv[]) {
             perror("ERROR on accept");
         } else {
             clients_mutex.lock();
-            clients_descriptors.push_back(client_socket);
+            clients.emplace_back(client_socket);
             clients_mutex.unlock();
+            clients_condition.notify_all();
             printf("Connected %d\n", client_socket);
             fflush(stdout);
-            clients.emplace_back(std::thread(client_loop, client_socket));
         }
-    }
-
-    for (auto &client : clients) {
-        client.join();
     }
     return 0;
 }
