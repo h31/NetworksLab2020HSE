@@ -148,7 +148,7 @@ void poll_loop() {
     while (is_running) {
         clients_mutex.lock();
         int clients_count = clients.size();
-        pollfd *fds = new pollfd[clients.size()];
+        pollfd fds[clients.size()];
         int cur = 0;
         for (auto &client : clients) {
             fds[cur].fd = client.descriptor;
@@ -156,7 +156,7 @@ void poll_loop() {
             cur++;
         }
         clients_mutex.unlock();
-        int ready = poll(fds, clients_count, 5000); // every 5 seconds we should refresh clients
+        int ready = poll(fds, clients_count, 1000); // every second we should refresh clients
         if (ready == -1) {
             perror("poll error");
             is_running = false;
@@ -164,10 +164,10 @@ void poll_loop() {
         }
         if (ready != 0) {
             for (int i = 0; i < clients_count; ++i) {
-                if (fds[cur].revents & POLLIN) {
+                if (fds[i].revents & POLLIN) {
                     char buffer[256];
                     bzero(buffer, 256);
-                    int n = read(fds[cur].fd, buffer, 255);
+                    int n = read(fds[i].fd, buffer, 255);
                     if(n < 0) {
                         perror("read error");
                         exit(1);
@@ -176,12 +176,12 @@ void poll_loop() {
                         perror("TODO read 0");
                         exit(1);
                     }
-                    printf("Read %d bytes from %d\n", n, fds[cur].fd);
+                    printf("Read %d bytes from %d\n", n, fds[i].fd);
                     fflush(stdout);
                     std::string message(buffer, n);
                     clients_mutex.lock();
                     for (auto &client : clients) {
-                        if (client.descriptor == fds[cur].fd) {
+                        if (client.descriptor == fds[i].fd) {
                             client.recieve_message(message);
                             break;
                         }
