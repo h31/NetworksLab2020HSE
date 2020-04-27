@@ -1,39 +1,109 @@
-#include <cstdio>
 #include <iostream>
+#include <memory>
+#include <asm/ioctls.h>
+#include <stropts.h>
 #include "server.h"
 
+const int ON = 1;
+
+void server::start() {
+    if (running.exchange(true)) {
+        std::cout << "Server has already started on socket:" << accept_fd.fd << " port:" <<  port << std::endl;
+    }
+    loop_thread = std::thread(&server::loop, this);
+}
+
 void server::loop() {
-    fprintf(stdout, "Server has started on port: %d", port);
-    std::cout << std::endl;
+    std::cout << "Start server on socket:" << accept_fd.fd << " port:" << port << std::endl;
+
     while (running) {
-        listen(socket_fd, 5);
-        int client_socket_fd = connect_client();
-        if (client_socket_fd < 0) {
-            fprintf(stderr, "Error on accepting client: %d\n", client_socket_fd);
-            continue;
+
+        int accept_fd_index = clients.size();
+        pollfd fds[accept_fd_index + 1];
+        int i = 0;
+        for (const auto& client : clients)
+        {
+            fds[i++] = client.second->get_fd();
         }
-        clients_chat.add_client(client_socket_fd);
+        fds[accept_fd_index] = accept_fd;
+
+        if (poll(fds, accept_fd_index + 1, 3500) < 0) {
+            std::cerr << "Error on polling sockets" << std::endl;
+            break;
+        }
+
+        accept_clients();
+
+        for (int i = 0; i < accept_fd_index; i++)
+        {
+            if (fds[i].revents & POLLIN) {
+                read(fds[i].fd);
+            }
+            if (fds[i].revents & POLLOUT) {
+                write(fds[i].fd);
+            }
+        }
     }
 }
 
-void server::shutdown() {
+
+void server::accept_clients() {
+    while (running) {
+        int fd = accept(accept_fd.fd, nullptr, nullptr);
+        if (fd < 0) {
+            if (running && errno != EWOULDBLOCK) {
+                std::cerr << "Error on accepting client" << std::endl;
+            }
+            break;
+        }
+        if (ioctl(fd, FIONBIO, (char*) &ON) < 0) {
+            std::cerr << "Error on switching client socket" << fd << "to non-blocking mode" << std::endl;
+            close(fd);
+        }
+        std::cout << "Accept client on socket:" << fd << std::endl;
+        clients[fd] = std::make_shared<client>(fd, this);
+    }
+}
+
+void server::remove_client(int fd) {
+    if (clients.find(fd) != clients.end()) {
+        std::cout << "Remove client on socket:" << fd << std::endl;
+        clients.erase(fd);
+    }
+}
+
+void server::read(int fd) {
+    if (clients.find(fd) != clients.end()) {
+        auto client = clients[fd].get();
+        if (client->read() < 0) {
+            remove_client(fd);
+        }
+        if (client->ready()) {
+            write_all(client->get_msg());
+        }
+    }
+}
+
+void server::write(int fd) {
+    if (clients.find(fd) != clients.end()) {
+        auto client = clients[fd].get();
+        if (client->write() < 0) {
+            remove_client(fd);
+        }
+    }
+}
+
+void server::write_all(const message& msg) {
+    for (const auto& client : clients) {
+        client.second->put_msg(msg);
+    }
+}
+
+void server::stop() {
     if (running.exchange(false)) {
-        fprintf(stdout, "Start shutdown server on port: %d", port);
-        std::cout << std::endl;
-
-        clients_chat.shutdown();
-
-        ::shutdown(socket_fd, SHUT_RDWR);
-        close(socket_fd);
-        accept_thread.join();
-
-        fprintf(stdout, "Finish shutdown server on port: %d", port);
-        std::cout << std::endl;
+        std::cout << "Shutdown server on socket:" << accept_fd.fd << " port:" <<  port << std::endl;
+        clients.clear();
+        close(accept_fd.fd);
+        loop_thread.join();
     }
-}
-
-int server::connect_client() const {
-    unsigned int addr_size = sizeof(sockaddr_in);
-    sockaddr_in client_addr{};
-    return accept(socket_fd, reinterpret_cast<sockaddr*>(&client_addr), &addr_size);
 }

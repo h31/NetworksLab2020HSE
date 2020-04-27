@@ -8,33 +8,39 @@ void client::read_loop() {
     char msg_size_buffer[sizeof(uint32_t)];
     while (true) {
         if (io.read_int32(body_size_buffer) < 0) {
-            exit(1);
+            std::cerr << "Error on read message" << std::endl;
+            break;
         }
 
         time_t time = io.read_time(time_buffer);
         if (time < 0) {
-            exit(1);
+            std::cerr << "Error on read message" << std::endl;
+            break;
         }
 
         int name_size = io.read_int32(name_size_buffer);
         if (name_size < 0) {
-            exit(1);
+            std::cerr << "Error on read message" << std::endl;
+            break;
         }
 
         char* name_buffer = new char[name_size];
         if (io.read_bytes(name_size, name_buffer) < 0) {
-            exit(1);
+            std::cerr << "Error on read message" << std::endl;
+            break;
         }
         name_buffer[name_size] = '\0';
 
         int msg_size = io.read_int32(msg_size_buffer);
         if (msg_size < 0) {
-            exit(1);
+            std::cerr << "Error on read message" << std::endl;
+            break;
         }
 
         char* msg_buffer = new char[msg_size];
         if (io.read_bytes(msg_size, msg_buffer) < 0) {
-            exit(1);
+            std::cerr << "Failed to read message" << std::endl;
+            break;
         }
         msg_buffer[msg_size] = '\0';
         std::string time_str = std::ctime(&time);
@@ -53,11 +59,13 @@ void client::write_loop() {
                 io.write_int32(name_size) < 0 || io.write_bytes(name_size, name.c_str()) < 0 ||
                 io.write_int32(msg_size) < 0 || io.write_bytes(msg_size, msg.c_str()) < 0)
         {
-            exit(1);
+            std::cerr << "Error on write message" << std::endl;
+            break;
         }
     }
 }
 
 void client::shutdown() {
-
+    read_thread.join();
+    write_thread.join();
 }

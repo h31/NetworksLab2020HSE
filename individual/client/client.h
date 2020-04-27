@@ -4,22 +4,29 @@
 
 #include <string>
 #include <atomic>
+#include <thread>
 #include "socket_io.h"
-#include <boost/thread.hpp>
 class client {
 
 public:
     std::atomic<bool> running;
+
 private:
     std::string name;
     int socket_fd;
     socket_io io;
-    boost::thread  read_thread;
-    boost::thread  write_thread;
+    std::thread  read_thread;
+    std::thread  write_thread;
+
+    void read_loop();
+
+    void write_loop();
+
+    void shutdown();
 
 public:
-    client(const char* name, int socket_fd) :   name(name),
-                                                running(true),
+    client(const char* name, int socket_fd) :   running(true),
+                                                name(name),
                                                 socket_fd(socket_fd),
                                                 io(socket_fd),
                                                 read_thread(&client::read_loop, this),
@@ -28,14 +35,6 @@ public:
     ~client() {
         shutdown();
     }
-
-private:
-
-    void read_loop();
-
-    void write_loop();
-
-    void shutdown();
 };
 
 

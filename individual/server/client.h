@@ -4,44 +4,42 @@
 
 #include <netinet/in.h>
 #include <thread>
-#include <boost/asio/thread_pool.hpp>
-#include <boost/thread.hpp>
 #include <unistd.h>
-#include "socket_io.h"
+#include <poll.h>
+#include <queue>
+#include "message.h"
 
-class chat;
+class server;
 
 class client {
 private:
-    std::atomic<bool> running;
-    int socket_fd;
-    socket_io io;
-    chat* chat_ptr;
-    boost::thread read_thread;
-    boost::asio::thread_pool write_thread;
-
-    void loop();
+    pollfd fd;
+    server* server_ptr;
+    message input;
+    std::queue<message> output;
 
 public:
-    client(int socket_fd, chat* chat_ptr) : socket_fd(socket_fd),
-                                            io(socket_fd),
-                                            chat_ptr(chat_ptr),
-                                            running(true),
-                                            read_thread(&client::loop, this),
-                                            write_thread(1) {}
+    client(int fd, server* server_ptr) : fd(pollfd{fd, POLLIN, 0}), server_ptr(server_ptr) {}
 
-    bool operator==(const client& other) const
-    {
-        return socket_fd == other.socket_fd;
+    int read();
+
+    pollfd get_fd() const {
+        return fd;
     }
 
-    void send(const message& msg);
+    int write();
 
-    void shutdown();
+    void put_msg(const message& msg);
+    
+    message get_msg();
 
     ~client() {
-        shutdown();
+        std::cout << "Shutdown client on socket:" << fd.fd;
+        close(fd.fd);
     }
+
+    bool ready();
+
 };
 
 

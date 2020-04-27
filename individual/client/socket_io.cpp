@@ -10,7 +10,7 @@ static time_t millis_to_time(uint64_t millis) {
 }
 
 time_t socket_io::read_time(char* buffer) const {
-    uint64_t millis = read_int64(buffer);
+    int64_t millis = read_int64(buffer);
     if (millis < 0) {
         return -1;
     }
@@ -23,14 +23,14 @@ int socket_io::write_time() const {
     return write_int64(millis);
 }
 
-int socket_io::write_int64(uint64_t value) const {
+int32_t socket_io::write_int64(uint64_t value) const {
     char buffer[sizeof(uint64_t)];
     uint64_t nvalue = htobe64(value);
     memcpy(buffer, &nvalue, sizeof(uint64_t));
     return write_bytes(sizeof(uint64_t), buffer);
 }
 
-uint64_t socket_io::read_int64(char* buffer) const {
+int64_t socket_io::read_int64(char* buffer) const {
     if (read_bytes(sizeof(uint64_t), buffer) < 0) {
         return -1;
     }
@@ -39,7 +39,7 @@ uint64_t socket_io::read_int64(char* buffer) const {
     return be64toh(value);
 }
 
-uint32_t socket_io::read_int32(char* buffer) const {
+int32_t socket_io::read_int32(char* buffer) const {
     if (read_bytes(sizeof(uint32_t), buffer) < 0) {
         return -1;
     }
@@ -48,15 +48,15 @@ uint32_t socket_io::read_int32(char* buffer) const {
     return ntohl(value);
 }
 
-uint32_t socket_io::write_int32(uint32_t value) const {
+int32_t socket_io::write_int32(uint32_t value) const {
     char buffer[sizeof(uint32_t)];
     uint32_t nvalue = htonl(value);
     memcpy(buffer, &nvalue, sizeof(uint32_t));
     return write_bytes(sizeof(uint32_t), buffer);
 }
 
-int socket_io::read_bytes(unsigned int total_bytes, char* buffer) const {
-    int cur_bytes = 0;
+int32_t socket_io::read_bytes(uint32_t total_bytes, char* buffer) const {
+    uint32_t cur_bytes = 0;
     while (cur_bytes < total_bytes) {
         ssize_t nbytes = read(socket_fd, buffer, total_bytes - cur_bytes);
         if (nbytes < 0) {
@@ -68,8 +68,8 @@ int socket_io::read_bytes(unsigned int total_bytes, char* buffer) const {
     return cur_bytes;
 }
 
-int socket_io::write_bytes(unsigned int total_bytes, const char* buffer) const {
-    int cur_bytes = 0;
+int32_t socket_io::write_bytes(uint32_t total_bytes, const char* buffer) const {
+    uint32_t cur_bytes = 0;
     while (cur_bytes < total_bytes) {
         ssize_t nbytes = write(socket_fd, buffer, total_bytes - cur_bytes);
         if (nbytes < 0) {

@@ -1,34 +1,48 @@
 #ifndef SERVER_SERVER_H
 #define SERVER_SERVER_H
 
-
 #include <netinet/in.h>
+#include <sys/poll.h>
+#include <unordered_map>
+#include <atomic>
 #include "client.h"
-#include "chat.h"
+#include "message.h"
+
 
 class server {
+
 private:
-    std::atomic<bool> running;
-    chat clients_chat;
-    int socket_fd;
     uint16_t port;
-    boost::thread accept_thread;
+    std::atomic<bool> running;
+    pollfd accept_fd;
+    std::thread loop_thread;
+    std::unordered_map<int, std::shared_ptr<client>> clients;
 
 public:
 
-    server(uint16_t port, int socket_fd) : port(port), socket_fd(socket_fd), running(true), accept_thread(&server::loop, this) {}
+    server(uint16_t port, int fd) : port(port), running(false), accept_fd(pollfd{fd, POLLIN, 0}) {};
 
-    void shutdown();
+    void stop();
+
+    void start();
+
+    void write_all(const message& msg);
 
     ~server() {
-        shutdown();
+        stop();
     }
 
 private:
 
     void loop();
 
-    int connect_client() const;
+    void write(int fd);
+
+    void read(int fd);
+
+    void remove_client(int fd);
+
+    void accept_clients();
 };
 
 

@@ -64,9 +64,5 @@ int main(int argc, char *argv[]) {
 
     client(name, socket_fd);
 
-    while(true) {
-
-    }
-
     return 0;
 }
