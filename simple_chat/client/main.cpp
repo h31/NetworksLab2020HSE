@@ -1,13 +1,25 @@
 #include "../readn.hpp"
 
-void* sender(void* arg) {
-    int socket = *((int*) arg); 
+void send(char* name, char* message, client_info_t* info) {
+    char buffer[TEXT_MSG_LEN];
 
-    char buffer[MAX_MSG_LEN];
-    char msg[MSG_LEN];
-    char name[NAME_LEN];
+    bzero(buffer, TEXT_MSG_LEN);
 
+    strcpy(buffer, name);
+    strcat(buffer, " : ");
+    strcat(buffer, message);
 
+    int len = strlen(buffer);
+    
+    char msg[MSG_LEN_LEN + len];
+    bzero(msg, MSG_LEN_LEN + len);
+    memcpy(msg, &len, MSG_LEN_LEN);
+    memcpy(msg + MSG_LEN_LEN, buffer, len);
+
+    info->set_write(msg, MSG_LEN_LEN + len);
+}
+
+void read_name(char* name) {
     printf("Enter your name: ");
     bzero(name, NAME_LEN);
     fgets(name, NAME_LEN - 1, stdin);
@@ -18,50 +30,15 @@ void* sender(void* arg) {
             break;
         }
     }
-
-    while (1) {
-        bzero(msg, MSG_LEN);
-        fgets(msg, MSG_LEN - 1, stdin);
-
-        bzero(buffer, MAX_MSG_LEN);
-
-        strcpy(buffer, name);
-        strcat(buffer, " : ");
-        strcat(buffer, msg);
-
-        int n = sendmessage(socket, strlen(buffer) + 1, buffer);
-
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            close(socket);
-            exit(1);
-        }
-    }
 }
 
-void* getter(void* arg) {
-    int socket = *((int*) arg);
+void print_message(client_info_t* info) {
+    time_t rawtime;
+    time(&rawtime);
+    struct tm* timeinfo = localtime(&rawtime);
 
-    char buffer[MAX_MSG_LEN];
-
-    while (1) {
-        bzero(buffer, MAX_MSG_LEN);
-        int n = getmessage(socket, buffer);
-
-        if (n < 0) {
-            perror("ERROR reading from socket");
-            close(socket);
-            exit(1);
-        }
-
-        time_t rawtime;
-        time(&rawtime);
-        struct tm* timeinfo = localtime(&rawtime);
-
-        printf("<%i:%i:%i> %s", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, buffer);
-    }
+    printf("<%i:%i:%i> %s", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, info->read_buffer);
 }
-
 
 int main(int argc, char *argv[]) {
     int sockfd, err;
@@ -80,23 +57,19 @@ int main(int argc, char *argv[]) {
     hints.ai_protocol = IPPROTO_TCP;
 
     err = getaddrinfo(hostname, port, &hints, &addrs);
-    if (err != 0)
-    {
+    if (err != 0) {
         fprintf(stderr, "%s: %s\n", hostname, gai_strerror(err));
         exit(1);
     }
 
-    for(struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next)
-    {
+    for(struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next) {
         sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-        if (sockfd == -1)
-        {
+        if (sockfd == -1) {
             err = errno;
             break;
         }
 
-        if (connect(sockfd, addr->ai_addr, addr->ai_addrlen) == 0)
-        {
+        if (connect(sockfd, addr->ai_addr, addr->ai_addrlen) == 0) {
             break;
         }
 
@@ -114,14 +87,52 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    printf("Connected to chat\n");
+    int ret = fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    if (ret < 0) {
+        perror("non blocking set error");
+        exit(1);   
+    }
 
-    pthread_t senderThread, getterThread;
-    pthread_create(&senderThread, 0, sender, (void*) &sockfd);
-    pthread_create(&getterThread, 0, getter, (void*) &sockfd);
+    pollfd_t fds[2];
+    fds[0].fd = sockfd;
+    fds[0].events = POLLIN | POLLOUT;
 
-    pthread_join(getterThread, 0);
-    pthread_join(senderThread, 0);
+    fds[1].fd = STDIN_FILENO;
+    fds[1].events = POLLIN;
+
+    client_info_t info(sockfd);
+
+    char name[NAME_LEN];
+    read_name(name);
+
+    char message[MSG_LEN];
+    while (1) {
+        int ret = poll(fds, 2, TIMEOUT);
+        if (ret < 0) {
+            perror("poll ERROR");
+            close(sockfd);
+            return 0;
+        } else if (ret == 0) {
+            continue;
+        }
+
+        if (fds[1].revents > 0) {
+            bzero(message, MSG_LEN);
+            fgets(message, MSG_LEN - 1, stdin);
+            send(name, message, &info);
+        }
+
+        if (fds[0].revents | POLLIN) {
+            int ret = read_from(&info);
+            if (ret == 1) {
+                print_message(&info);
+            }
+            info.set_read();
+        } 
+        if (fds[0].revents | POLLOUT) {
+            write_to(&info);
+        }
+    }
 
     return 0;
 }

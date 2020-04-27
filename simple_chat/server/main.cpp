@@ -1,86 +1,20 @@
 #include "../readn.hpp"
 
-typedef struct clients
-{
-    pthread_mutex_t mutex;
-    int size;
-    int* sockets;
+#include <vector>
 
-    clients() {
-        size = 100;
-        pthread_mutex_init(&mutex, NULL);
-        sockets = (int*) calloc(size, sizeof(int));
+void send_to_all(client_info_t* from, std::vector<client_info_t>& clilents) {
+    int len = strlen(from->read_buffer);
+    char msg[MSG_LEN_LEN + len];
+    bzero(msg, MSG_LEN_LEN + len);
+    memcpy(msg, &len, MSG_LEN_LEN);
+    memcpy(msg + MSG_LEN_LEN, from->read_buffer, len);
+
+    for (size_t i = 0; i < clilents.size(); i++) {
+        clilents[i].set_write(msg, MSG_LEN_LEN + len);
     }
-
-    ~clients() {
-        free(sockets);
-        pthread_mutex_destroy(&mutex);
-    }
-
-    int addClient(int socket) {
-        for (int i = 0; i < size; i++) {
-            if (sockets[i] == 0) {
-                pthread_mutex_lock(&mutex);
-                sockets[i] = socket;
-                pthread_mutex_unlock(&mutex);
-                return i;
-            }
-        }
-        resize();
-        return addClient(socket);
-    }
-
-    void resize() {
-        pthread_mutex_lock(&mutex);
-        size *= 2;
-        sockets = (int*) realloc(sockets, sizeof(int) * size);
-        memset(sockets + size/2, 0, size/2);
-        pthread_mutex_unlock(&mutex);
-    }
-
-    void remove(int index) {
-        pthread_mutex_lock(&mutex);
-        close(sockets[index]);
-        sockets[index] = 0;
-        pthread_mutex_unlock(&mutex);
-    }
-} clients_t ;
-
-typedef struct client_info
-{
-    clients_t* clients_list;
-    int sockfd;
-} client_info_t;
-
-
-void* client(void* arg) {
-    client_info_t* info = (client_info_t*) arg;
-    clients_t* clients_list = info->clients_list;
-    int num = clients_list->addClient(info->sockfd);
-
-    char buffer[MAX_MSG_LEN];
-
-    while(1) {
-        bzero(buffer, MAX_MSG_LEN);
-        int n = getmessage(info->sockfd, buffer);
-        if (n < 0) {
-            clients_list->remove(num);
-            return 0;
-        }
-
-        // printf("got message: %s\n", buffer);
-
-        pthread_mutex_lock(&(clients_list->mutex));
-
-        for (int i = 0; i < clients_list->size; i++) {
-            if (clients_list->sockets[i] != 0) {
-                sendmessage(clients_list->sockets[i], strlen(buffer) + 1, buffer);
-            }
-        }
-
-        pthread_mutex_unlock(&(clients_list->mutex));
-    }
+    from->set_read();
 }
+
 
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd;
@@ -116,26 +50,59 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    int ret = fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    if (ret < 0) {
+        perror("non blocking set error");
+        exit(1);   
+    }
     listen(sockfd, 5);
 
-    clients_t clients_list;
+    std::vector<client_info_t> clients_list;
 
     while (1) {
-        clilen = sizeof(cli_addr);
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        pollfd_t fds[clients_list.size() + 1];
+        fds[0].fd = sockfd;
+        fds[0].events = POLLIN;
 
-        if (newsockfd < 0) {
-            perror("ERROR on accept");
+        for (size_t i = 0; i < clients_list.size(); i++) {
+            fds[i + 1].fd = clients_list[i].socket;
+            fds[i + 1].events = POLLIN | POLLOUT;
+        }
+
+        int n = poll(fds, clients_list.size() + 1, TIMEOUT);
+        if (n < 0) {
+            perror("poll ERROR");
+            exit(1);
+        } else if (n == 0) {
             continue;
         }
 
-        client_info_t info;
-        info.clients_list = &clients_list;
-        info.sockfd = newsockfd;
+        if (fds[0].revents | POLLIN) {
+            clilen = sizeof(cli_addr);
+            newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+            int ret = fcntl(newsockfd, F_SETFL, O_NONBLOCK);
+            if (newsockfd < 0 || ret < 0) {
+                // perror("non blocking set error");
+            } else {
+                client_info_t info(newsockfd);
+                clients_list.push_back(info);
+                printf("Accepted\n");
+            }
+        }
 
-        pthread_t thread;
-        printf("connected %i\n", newsockfd);
-        pthread_create(&thread, 0, client, (void*) &info);
+        for (size_t i = 0; i < clients_list.size(); i++) {
+            client_info_t* current = &clients_list[i];
+            if (fds[i + 1].revents | POLLIN) {
+                int res = read_from(current);
+                if (res == 1) {
+                    send_to_all(current, clients_list);
+                }
+            }
+
+            if (fds[i + 1].revents | POLLOUT) {
+                write_to(current);
+            }
+        }
     }
 
     return 0;
