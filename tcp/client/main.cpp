@@ -111,13 +111,24 @@ int main(int argc, char *argv[]) {
 
     std::thread messages(read_loop, sockfd);
 
+    bool is_nickname_set = false;
+
     while(is_running) {
         /* Now ask for a message from the user, this message
            * will be read by server
         */
 
         bzero(buffer, 256);
+        if(!is_nickname_set) {
+            printf("Write your nickname:\n");
+            is_nickname_set = true;
+        }
         fgets(buffer, 255, stdin);
+
+        int len = strlen(buffer);
+        if(len > 0 && buffer[len - 1] == '\n') {
+            buffer[len - 1] = buffer[len]; // '\0'
+        }
 
         /* Send message to the server */
 

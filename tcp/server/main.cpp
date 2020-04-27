@@ -12,11 +12,13 @@
 #include <mutex>
 #include <algorithm>
 #include <signal.h>
+#include <map>
 
 std::atomic_bool is_running;
 std::atomic_int accept_file_descriptor;
 std::mutex clients_mutex;
 std::vector<int> clients_descriptors;
+std::map<int, std::string> client_nickname;
 
 void sigint_handler_callback(int signum) {
     is_running = false;
@@ -65,6 +67,9 @@ std::pair<std::string, bool> read_message(int client_file_descriptor) {
     }
     uint32_t length = ntohl(*(uint32_t *) length_buf);
     printf("READ %d length\n", length);
+    if (length == 0) {
+        return {"", true};
+    }
     std::string message;
     message.resize(length);
     n = readn(client_file_descriptor, &message[0], length); // dangerous usage of &message[0]
@@ -76,15 +81,37 @@ std::pair<std::string, bool> read_message(int client_file_descriptor) {
 }
 
 void client_loop(int client_file_descriptor) {
+    bool is_nickname_set = false;
     while (is_running) {
         auto res = read_message(client_file_descriptor);
         auto message = res.first;
+
+        clients_mutex.lock();
+        if (!is_nickname_set) {
+            client_nickname[client_file_descriptor] = message;
+            is_nickname_set = true;
+            printf("Nickname for %d: set: %s\n", client_file_descriptor, message.c_str());
+            clients_mutex.unlock();
+            continue;
+        }
         printf("Got message from %d: %s\n", client_file_descriptor, message.c_str());
         fflush(stdout);
-        message = "MESSAGE FROM " + std::to_string(client_file_descriptor) + ": " + message;
-        clients_mutex.lock();
+        message = "MESSAGE FROM " + std::to_string(client_file_descriptor) + "(" +
+                  client_nickname[client_file_descriptor] + "): " + message;
+
+        time_t rawtime;
+        struct tm *timeinfo;
+        char buffer[80];
+
+        time(&rawtime);
+        timeinfo = localtime(&rawtime);
+
+        strftime(buffer, 80, "%H:%M", timeinfo);
+        std::string broadcast_message =
+                "<" + std::string(buffer) + "> " + " [" + client_nickname[client_file_descriptor] + "]: " +
+                message + "\n";
         for (auto client_fd : clients_descriptors) {
-            int n = writen(client_fd, message.c_str(), message.size());
+            int n = writen(client_fd, broadcast_message.c_str(), broadcast_message.size());
             if (n < 0) {
                 perror("ERROR writing to socket");
                 exit(1);
@@ -97,10 +124,11 @@ void client_loop(int client_file_descriptor) {
     }
     printf("Close connection with %d", client_file_descriptor);
     fflush(stdout);
-    clients_mutex.lock();
     close(client_file_descriptor);
+    clients_mutex.lock();
     clients_descriptors.erase(
             std::find(clients_descriptors.begin(), clients_descriptors.end(), client_file_descriptor));
+    client_nickname.erase(client_file_descriptor);
     clients_mutex.unlock();
 }
 
@@ -155,7 +183,7 @@ int main(int argc, char *argv[]) {
             clients_mutex.unlock();
             printf("Connected %d\n", client_socket);
             fflush(stdout);
-            clients.push_back(std::thread(client_loop, client_socket));
+            clients.emplace_back(std::thread(client_loop, client_socket));
         }
     }
 
