@@ -33,7 +33,7 @@ static std::vector<uint8_t> get_text_message(const char* name, const char* text)
 static int write_buffer_to_socket(int sockfd, std::vector<uint8_t> buffer) {
     int left = buffer.size();
     while (left) {
-        int current = write(sockfd, &buffer[0], left);
+        int current = write(sockfd, &buffer[buffer.size() - left], left);
         if (current < 0) {
             return current;
         } else {
@@ -61,20 +61,20 @@ static int read_full_message(int sockfd, std::vector<uint8_t> &name, std::vector
     if (err < 0) {
         return err;
     }
-    uint8_t name_length = uint16_t_from_buffer(name_length_vec);
+    uint8_t name_length = name_length_vec[0];
     name.resize(name_length);
-    err = read_buffer_from_socket(sockfd, name, 1);
+    err = read_buffer_from_socket(sockfd, name, name_length);
     if (err < 0) {
         return err;
     }
 
-    err = read_buffer_from_socket(sockfd, text_length_vec, 1);
+    err = read_buffer_from_socket(sockfd, text_length_vec, 2);
     if (err < 0) {
         return err;
     }
     uint16_t text_length = uint16_t_from_buffer(text_length_vec);
     text.resize(text_length);
-    err = read_buffer_from_socket(sockfd, text, 1);
+    err = read_buffer_from_socket(sockfd, text, text_length);
     if (err < 0) {
         return err;
     }
