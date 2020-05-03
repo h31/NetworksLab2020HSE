@@ -9,7 +9,7 @@
 #include <time.h>
 
 #include <protocol_utils.h>
-
+#include <pthread.h>
 int main(int argc, char *argv[]) {
     int sockfd, newsockfd;
     uint16_t portno;
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
         printf("End of connection\n");
         return 0;
     }
-
+    
     printf("%s connected!\n", name);
     
     while(1) {
