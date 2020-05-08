@@ -8,7 +8,7 @@ import java.util.concurrent.TimeoutException;
 public class NetworkService {
     private static final int BUFFER_SIZE = 1024;
     private static final int RETRY = 5;
-    private static final int TIMEOUT_MILLIS = 1000000;
+    private static final int TIMEOUT_MILLIS = 5000;
 
     private final DatagramSocket datagramSocket;
     private final InetAddress remoteAddress;
