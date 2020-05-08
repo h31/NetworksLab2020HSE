@@ -1,9 +1,20 @@
-package ru.hse.lyubortk.tftp.server
+package ru.hse.lyubortk.tftp.communication
 
+import ru.hse.lyubortk.tftp.model.Mode
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+
+fun InputStream.withConversions(mode: Mode) = when (mode) {
+    Mode.NETASCII -> NetasciiInputStream(this)
+    Mode.OCTET -> this
+}
+
+fun OutputStream.withConversions(mode: Mode) = when (mode) {
+    Mode.NETASCII -> NetasciiOutputStream(this)
+    Mode.OCTET -> this
+}
 
 // LF -> CR,LF
 // CR -> CR,NUL
@@ -35,6 +46,7 @@ class NetasciiInputStream(inner: InputStream) : InputStream() {
         inner.close()
     }
 }
+
 // CR,NUL -> CR
 // CR,LF => LF
 class NetasciiOutputStream(inner: OutputStream) : OutputStream() {

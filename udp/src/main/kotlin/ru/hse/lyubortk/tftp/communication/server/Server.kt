@@ -1,4 +1,4 @@
-package ru.hse.lyubortk.tftp.server
+package ru.hse.lyubortk.tftp.communication.server
 
 import ru.hse.lyubortk.tftp.TFTP_PACKET_MAX_LENGTH
 import ru.hse.lyubortk.tftp.TFTP_SERVER_PORT

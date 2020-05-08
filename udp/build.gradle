@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-//    id 'application'
     id 'org.jetbrains.kotlin.jvm' version '1.3.72'
 }
 
@@ -17,8 +16,51 @@ dependencies {
 }
 
 task(runServer, dependsOn: 'classes', type: JavaExec) {
-    main = 'ru.hse.lyubortk.tftp.server.ServerKt'
+    main = 'ru.hse.lyubortk.tftp.communication.server.ServerKt'
     classpath = sourceSets.main.runtimeClasspath
+    if (project.hasProperty('port')) {
+        setArgsString(port)
+    } else {
+        setArgsString('')
+    }
+}
+
+def parseArgs(JavaExec delegate) {
+    if (project.hasProperty('file')) {
+        delegate.args(file)
+    } else {
+        delegate.args('')
+    }
+
+    if (project.hasProperty('ip')) {
+        delegate.args(ip)
+    } else {
+        delegate.args('')
+    }
+
+    if (project.hasProperty('mode')) {
+        delegate.args(mode)
+    } else {
+        delegate.args('octet')
+    }
+
+    if (project.hasProperty('port')) {
+        delegate.args(port)
+    }
+}
+
+task(clientGet, dependsOn: 'classes', type: JavaExec) {
+    main = 'ru.hse.lyubortk.tftp.communication.client.ClientKt'
+    classpath = sourceSets.main.runtimeClasspath
+    args 'GET'
+    parseArgs(getDelegate()) // sorry, I don't know groovy
+}
+
+task(clientPut, dependsOn: 'classes', type: JavaExec) {
+    main = 'ru.hse.lyubortk.tftp.communication.client.ClientKt'
+    classpath = sourceSets.main.runtimeClasspath
+    args 'PUT'
+    parseArgs(getDelegate())
 }
 
 compileKotlin {
