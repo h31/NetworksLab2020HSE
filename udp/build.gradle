@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+run {
+    standardInput = System.in
+}
+
+application {
+    mainClassName = 'ru.hsespb.tftp.Main'
+}
+
+group 'ru.hsespb'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
