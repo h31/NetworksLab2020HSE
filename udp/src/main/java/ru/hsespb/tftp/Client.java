@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Scanner;
 
 public class Client {
-    private static final int SERVER_INIT_PORT = 7777;
+    private static final int SERVER_INIT_PORT = 69;
     private static final int DATA_BUFFER_SIZE = 512;
     private static final String EXIT_COMMAND = "exit";
 

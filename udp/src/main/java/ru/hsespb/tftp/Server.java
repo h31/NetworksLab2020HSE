@@ -7,7 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server {
-    private static final int PORT = 7777;
+    private static final int PORT = 69;
     private static final int BUFFER_SIZE = 1024;
 
     private final ExecutorService pool;
