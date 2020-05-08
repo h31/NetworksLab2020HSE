@@ -9,6 +9,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketAddress
 
+@ExperimentalUnsignedTypes
 fun main(args: Array<String>) = try {
     val port = args.getOrNull(0)?.toIntOrNull() ?: TFTP_SERVER_PORT
     println("Using port: $port")
@@ -19,6 +20,7 @@ fun main(args: Array<String>) = try {
     System.err.println("Exception in server was not handled: $e")
 }
 
+@ExperimentalUnsignedTypes
 class Server(serverPort: Int) : Closeable {
     private val socket: DatagramSocket = DatagramSocket(serverPort)
 

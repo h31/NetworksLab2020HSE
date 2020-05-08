@@ -8,9 +8,11 @@ class ReadRequest(filename: String, mode: Mode): Request(filename, mode)
 
 class WriteRequest(fileName: String, mode: Mode): Request(fileName, mode)
 
-class Data(val blockNumber: Short, val data: ByteArray): Message()
+@kotlin.ExperimentalUnsignedTypes
+class Data(val blockNumber: UShort, val data: ByteArray): Message()
 
-class Acknowledgment(val blockNumber: Short): Message()
+@kotlin.ExperimentalUnsignedTypes
+class Acknowledgment(val blockNumber: UShort): Message()
 
 class ErrorMessage(val errorType: ErrorType, val errorMessage: String): Message()
 

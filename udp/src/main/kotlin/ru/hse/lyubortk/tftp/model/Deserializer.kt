@@ -9,6 +9,7 @@ class UnknownOperation(code: Short) : DeserializationException("Operation code $
 class UnknownMode(str: String) : DeserializationException("Mode $str is not supported")
 class UnknownErrorCode(code: Short) : DeserializationException("Error code $code is not supported")
 
+@ExperimentalUnsignedTypes
 object Deserializer {
     fun deserialize(bytes: ByteArray): Message {
         if (bytes.size < Short.SIZE_BYTES) {
@@ -53,13 +54,13 @@ object Deserializer {
     }
 
     private fun deserializeData(bytes: ByteArray): Data {
-        val blockNumber = bytes.copyOf(Short.SIZE_BYTES).toShort()
+        val blockNumber = bytes.copyOf(Short.SIZE_BYTES).toUShort()
         val data = bytes.drop(Short.SIZE_BYTES).toByteArray()
         return Data(blockNumber, data)
     }
 
     private fun deserializeAcknowledgment(bytes: ByteArray): Acknowledgment {
-        val blockNumber = bytes.copyOf(Short.SIZE_BYTES).toShort()
+        val blockNumber = bytes.copyOf(Short.SIZE_BYTES).toUShort()
         return Acknowledgment(blockNumber)
     }
 
@@ -85,3 +86,11 @@ private fun ByteArray.toShort(): Short =
         .put(this)
         .flip()
         .short
+
+@ExperimentalUnsignedTypes
+private fun ByteArray.toUShort(): UShort =
+    ByteBuffer.allocate(Short.SIZE_BYTES)
+        .put(this)
+        .flip()
+        .short
+        .toUShort()

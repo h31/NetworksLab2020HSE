@@ -8,6 +8,7 @@ sealed class SerializationException(msg: String) : RuntimeException(msg)
 class InvalidNameException : SerializationException("Check that names contain only non-zero ascii characters.")
 class ResultTooLongException : SerializationException("Resulting byte array is too long for TFTP")
 
+@ExperimentalUnsignedTypes
 object Serializer {
     fun serialize(message: Message): ByteArray {
         val bytes = message.getTypeCode().bytes().toMutableList()
@@ -56,6 +57,12 @@ private fun validateString(str: String) {
     }
 }
 
+@ExperimentalUnsignedTypes
+private fun UShort.bytes(): ByteArray =
+    ByteBuffer.allocate(Short.SIZE_BYTES)
+        .putShort(this.toShort())
+        .array()
+
 private fun Short.bytes(): ByteArray =
     ByteBuffer.allocate(Short.SIZE_BYTES)
         .putShort(this)
@@ -69,6 +76,7 @@ private fun String.isAscii(): Boolean =
 
 private fun String.hasNoZeroChars(): Boolean = this.all { it.toInt() != 0 }
 
+@ExperimentalUnsignedTypes
 private fun Message.getTypeCode(): Short =
     when (this) {
         is ReadRequest -> MessageType.READ_REQUEST_TYPE.value
