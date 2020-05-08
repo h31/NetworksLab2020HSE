@@ -3,10 +3,7 @@ package ru.hse.lyubortk.tftp.server
 import ru.hse.lyubortk.tftp.TFTP_DATA_MAX_LENGTH
 import ru.hse.lyubortk.tftp.TFTP_PACKET_MAX_LENGTH
 import ru.hse.lyubortk.tftp.model.*
-import java.io.Closeable
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.IOException
+import java.io.*
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketAddress
@@ -20,18 +17,39 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
     private val socket: DatagramSocket = DatagramSocket()
     private val singleThreadExecutor = Executors.newSingleThreadExecutor()
 
-    private fun run(initialRequest: Request) = when (initialRequest) {
-        is ReadRequest -> runRead(initialRequest)
-        is WriteRequest -> runWrite(initialRequest)
+    private fun run(request: Request) {
+        when (request) {
+            is ReadRequest -> {
+                val innerInputStream = File(request.fileName).inputStream()
+                val inputStreamWithConversions = when (request.mode) {
+                    Mode.NETASCII -> NetasciiInputStream(innerInputStream)
+                    Mode.OCTET -> innerInputStream
+                }
+                runRead(inputStreamWithConversions)
+            }
+            is WriteRequest -> {
+                val file = File(request.fileName)
+                if (!file.createNewFile()) {
+                    sendMessage(ErrorMessage(ErrorType.FILE_ALREADY_EXISTS, FILE_ALREADY_EXISTS_MESSAGE))
+                    return
+                }
+                val innerOutputStream = file.outputStream()
+                val outputStreamWithConversions = when(request.mode) {
+                    Mode.NETASCII -> NetasciiOutputStream(innerOutputStream)
+                    Mode.OCTET -> innerOutputStream
+                }
+                runWrite(outputStreamWithConversions)
+            }
+        }
     }
 
-    private fun runRead(readRequest: ReadRequest) {
+    private fun runRead(inputStream: InputStream) {
         try {
-            File(readRequest.fileName).inputStream().use { inputStream ->
+            inputStream.use { input ->
                 val bytes = ByteArray(TFTP_DATA_MAX_LENGTH)
                 var blockNumber: UShort = 1u
                 do {
-                    val readBytes = max(0, inputStream.read(bytes))
+                    val readBytes = max(0, input.read(bytes))
                     val acknowledgment = sendMessageWithRetry(Data(blockNumber, bytes.copyOf(readBytes))) {
                         (it as? Acknowledgment)?.takeIf { acknowledgment ->
                             acknowledgment.blockNumber == blockNumber
@@ -51,14 +69,9 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
         }
     }
 
-    private fun runWrite(writeRequest: WriteRequest) {
+    private fun runWrite(outputStream: OutputStream) {
         try {
-            val file = File(writeRequest.fileName)
-            if (!file.createNewFile()) {
-                sendMessage(ErrorMessage(ErrorType.FILE_ALREADY_EXISTS, FILE_ALREADY_EXISTS_MESSAGE))
-                return
-            }
-            file.outputStream().use { outputStream ->
+            outputStream.use { output ->
                 var blockNumber: UShort = 1u
                 do {
                     val data = sendMessageWithRetry(Acknowledgment((blockNumber - 1u).toUShort())) {
@@ -71,7 +84,7 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
                         return
                     }
                     val nonNullableData: Data = data
-                    outputStream.write(nonNullableData.data)
+                    output.write(nonNullableData.data)
                     blockNumber++ // Overflow is totally fine!
                 } while (nonNullableData.data.size == 512)
                 sendMessage(Acknowledgment((blockNumber - 1u).toUShort()))
