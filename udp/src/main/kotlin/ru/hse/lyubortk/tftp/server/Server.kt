@@ -30,8 +30,7 @@ class Server(serverPort: Int) : Closeable {
             socket.receive(packet)
             packet.socketAddress
             try {
-                when (val message =
-                    Deserializer.deserialize(packet.data.copyOf(packet.length))) {
+                when (val message = Deserializer.deserialize(packet.data.copyOf(packet.length))) {
                     is Request -> ClientHandler.start(packet.socketAddress, message)
                     else -> sendError(
                         packet.socketAddress,
