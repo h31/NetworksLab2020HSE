@@ -3,35 +3,59 @@ package ru.hse.lyubortk.tftp.communication.server
 import ru.hse.lyubortk.tftp.communication.BaseCommunicator
 import ru.hse.lyubortk.tftp.communication.withConversions
 import ru.hse.lyubortk.tftp.model.*
-import java.io.Closeable
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.IOException
+import java.io.*
 import java.net.SocketAddress
 
 @kotlin.ExperimentalUnsignedTypes
-class ClientHandler private constructor(clientAddress: SocketAddress) : Closeable, BaseCommunicator(clientAddress) {
+class ClientHandler private constructor(private val clientAddress: SocketAddress) : Closeable, BaseCommunicator() {
     private fun run(request: Request) {
         try {
             when (request) {
                 is ReadRequest -> {
                     val inputStream = File(request.fileName).inputStream().withConversions(request.mode)
-                    sendData(inputStream)
+                    sendData(inputStream, clientAddress)
                 }
                 is WriteRequest -> {
                     val file = File(request.fileName)
                     if (!file.createNewFile()) {
-                        sendMessage(ErrorMessage(ErrorType.FILE_ALREADY_EXISTS, FILE_ALREADY_EXISTS_MESSAGE))
+                        sendMessage(
+                            ErrorMessage(ErrorType.FILE_ALREADY_EXISTS, FILE_ALREADY_EXISTS_MESSAGE),
+                            clientAddress
+                        )
                         return
                     }
                     val outputStream = file.outputStream().withConversions(request.mode)
-                    receiveData(outputStream, Acknowledgment(0.toUShort()))
+                    receiveData(outputStream)
                 }
             }
         } catch (e: FileNotFoundException) {
-            sendMessage(ErrorMessage(ErrorType.FILE_NOT_FOUND, e.message ?: ""))
+            sendMessage(ErrorMessage(ErrorType.FILE_NOT_FOUND, e.message ?: ""), clientAddress)
         } catch (e: IOException) {
-            sendMessage(ErrorMessage(ErrorType.ACCESS_VIOLATION, e.message ?: ""))
+            sendMessage(ErrorMessage(ErrorType.ACCESS_VIOLATION, e.message ?: ""), clientAddress)
+        }
+    }
+
+    private fun receiveData(outputStream: OutputStream) {
+        outputStream.use { output ->
+            var blockNumber: UShort = 1u
+            do {
+                val data = sendMessageWithRetry(Acknowledgment((blockNumber - 1u).toUShort()), clientAddress) {
+                    (it as? Data)?.takeIf { data ->
+                        data.blockNumber == blockNumber
+                    }
+                }?.first
+
+                if (data == null) {
+                    sendMessage(ErrorMessage(ErrorType.NOT_DEFINED, NO_DATA_MESSAGE), clientAddress)
+                    System.err.println(NO_DATA_MESSAGE)
+                    return
+                }
+
+                val nonNullableData: Data = data
+                output.write(nonNullableData.data)
+                blockNumber++ // Overflow is totally fine!
+            } while (nonNullableData.data.size == 512)
+            sendMessage(Acknowledgment((blockNumber - 1u).toUShort()), clientAddress)
         }
     }
 

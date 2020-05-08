@@ -5,7 +5,6 @@ import ru.hse.lyubortk.tftp.TFTP_PACKET_MAX_LENGTH
 import ru.hse.lyubortk.tftp.model.*
 import java.io.Closeable
 import java.io.InputStream
-import java.io.OutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketAddress
@@ -16,7 +15,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 @kotlin.ExperimentalUnsignedTypes
-abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Closeable {
+abstract class BaseCommunicator : Closeable {
     private val socket: DatagramSocket = DatagramSocket()
     private val singleThreadExecutor = Executors.newSingleThreadExecutor(object : ThreadFactory {
         val defaultFactory = Executors.defaultThreadFactory()
@@ -27,19 +26,19 @@ abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Clos
         }
     })
 
-    protected fun sendData(inputStream: InputStream) {
+    protected fun sendData(inputStream: InputStream, remoteAddress: SocketAddress) {
         inputStream.use { input ->
             val bytes = ByteArray(TFTP_DATA_MAX_LENGTH)
             var blockNumber: UShort = 1u
             do {
                 val readBytes = max(0, input.read(bytes))
-                val acknowledgment = sendMessageWithRetry(Data(blockNumber, bytes.copyOf(readBytes))) {
+                val acknowledgment = sendMessageWithRetry(Data(blockNumber, bytes.copyOf(readBytes)), remoteAddress) {
                     (it as? Acknowledgment)?.takeIf { acknowledgment ->
                         acknowledgment.blockNumber == blockNumber
                     }
                 }
                 if (acknowledgment == null) {
-                    sendMessage(ErrorMessage(ErrorType.NOT_DEFINED, NO_ACKNOWLEDGMENT_MESSAGE))
+                    sendMessage(ErrorMessage(ErrorType.NOT_DEFINED, NO_ACKNOWLEDGMENT_MESSAGE), remoteAddress)
                     System.err.println(NO_ACKNOWLEDGMENT_MESSAGE)
                     return
                 }
@@ -48,38 +47,16 @@ abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Clos
         }
     }
 
-    protected fun receiveData(outputStream: OutputStream, firstMessage: Message) {
-        outputStream.use { output ->
-            var blockNumber: UShort = 1u
-            do {
-                val messageToSend = when (blockNumber) {
-                    1u.toUShort() -> firstMessage
-                    else -> Acknowledgment((blockNumber - 1u).toUShort())
-                }
-                val data = sendMessageWithRetry(messageToSend) {
-                    (it as? Data)?.takeIf { data ->
-                        data.blockNumber == blockNumber
-                    }
-                }
-                if (data == null) {
-                    sendMessage(ErrorMessage(ErrorType.NOT_DEFINED, NO_DATA_MESSAGE))
-                    System.err.println(NO_DATA_MESSAGE)
-                    return
-                }
-                val nonNullableData: Data = data
-                output.write(nonNullableData.data)
-                blockNumber++ // Overflow is totally fine!
-            } while (nonNullableData.data.size == 512)
-            sendMessage(Acknowledgment((blockNumber - 1u).toUShort()))
-        }
-    }
-
-    protected fun <T : Message> sendMessageWithRetry(message: Message, responseValidation: (Message) -> T?): T? {
+    protected fun <T : Message> sendMessageWithRetry(
+        message: Message,
+        remoteAddress: SocketAddress,
+        responseValidation: (Message) -> T?
+    ): Pair<T, SocketAddress>? {
         val startTime = System.currentTimeMillis()
         fun getRemainingTime() = max(0, startTime + RESPONSE_TIMEOUT_MILLIS - System.currentTimeMillis())
 
         while (getRemainingTime() > 0) {
-            sendMessage(message)
+            sendMessage(message, remoteAddress)
 
             val futures = singleThreadExecutor.invokeAll(mutableListOf(Callable {
                 val receivedPacket = DatagramPacket(ByteArray(TFTP_PACKET_MAX_LENGTH), TFTP_PACKET_MAX_LENGTH)
@@ -90,8 +67,8 @@ abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Clos
             if (futures[0].isCancelled) {
                 continue
             }
+            val packet = futures[0].get()
             val receivedMessage = try {
-                val packet = futures[0].get()
                 Deserializer.deserialize(packet.data.copyOf(packet.length))
             } catch (e: DeserializationException) {
                 System.err.println("Cannot deserialize message: $e")
@@ -99,25 +76,27 @@ abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Clos
             }
             val validatedMessage = responseValidation(receivedMessage)
             if (validatedMessage != null) {
-                return validatedMessage
+                return validatedMessage to packet.socketAddress
             }
-            printUnexpectedMessage(receivedMessage)
+            printUnexpectedMessage(receivedMessage, packet.socketAddress)
         }
         return null
     }
 
-    protected fun sendMessage(message: Message) {
+    protected fun sendMessage(message: Message, remoteAddress: SocketAddress) {
         val bytes = Serializer.serialize(message)
-        val packet = DatagramPacket(bytes, 0, bytes.size, clientAddress)
+        val packet = DatagramPacket(bytes, 0, bytes.size, remoteAddress)
         socket.send(packet)
     }
 
-    private fun printUnexpectedMessage(message: Message) {
+    private fun printUnexpectedMessage(message: Message, remoteAddress: SocketAddress) {
         when (message) {
             is ErrorMessage -> System.err.println(
-                "Received error of type ${message.errorType.name}: ${message.errorMessage}"
+                "Received error of type ${message.errorType.name}: ${message.errorMessage} from address $remoteAddress"
             )
-            else -> System.err.println("Received unexpected message of type ${message.javaClass.simpleName}")
+            else -> System.err.println(
+                "Received unexpected message of type ${message.javaClass.simpleName} from address $remoteAddress"
+            )
         }
     }
 
@@ -128,7 +107,7 @@ abstract class BaseCommunicator(private val clientAddress: SocketAddress) : Clos
 
     companion object BaseCommunicator {
         internal const val NO_ACKNOWLEDGMENT_MESSAGE = "Did not receive any acknowledgment for sent packet"
+        internal const val NO_DATA_MESSAGE = "Did not receive any data"
         private const val RESPONSE_TIMEOUT_MILLIS = 15000L
-        private const val NO_DATA_MESSAGE = "Did not receive any data"
     }
 }
