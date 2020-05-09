@@ -2,19 +2,19 @@ package ru.hse.lyubortk.tftp.model
 
 sealed class Message
 
-sealed class Request(val fileName: String, val mode: Mode): Message()
+sealed class Request(val fileName: String, val mode: Mode) : Message()
 
-class ReadRequest(filename: String, mode: Mode): Request(filename, mode)
+class ReadRequest(filename: String, mode: Mode) : Request(filename, mode)
 
-class WriteRequest(fileName: String, mode: Mode): Request(fileName, mode)
-
-@kotlin.ExperimentalUnsignedTypes
-class Data(val blockNumber: UShort, val data: ByteArray): Message()
+class WriteRequest(fileName: String, mode: Mode) : Request(fileName, mode)
 
 @kotlin.ExperimentalUnsignedTypes
-class Acknowledgment(val blockNumber: UShort): Message()
+class Data(val blockNumber: UShort, val data: ByteArray) : Message()
 
-class ErrorMessage(val errorType: ErrorType, val errorMessage: String): Message()
+@kotlin.ExperimentalUnsignedTypes
+class Acknowledgment(val blockNumber: UShort) : Message()
+
+class ErrorMessage(val errorType: ErrorType, val errorMessage: String) : Message()
 
 enum class Mode {
     NETASCII,

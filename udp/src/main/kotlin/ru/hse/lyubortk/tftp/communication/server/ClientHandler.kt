@@ -1,5 +1,6 @@
 package ru.hse.lyubortk.tftp.communication.server
 
+import ru.hse.lyubortk.tftp.TFTP_DATA_MAX_LENGTH
 import ru.hse.lyubortk.tftp.communication.BaseCommunicator
 import ru.hse.lyubortk.tftp.communication.withConversions
 import ru.hse.lyubortk.tftp.model.*
@@ -54,7 +55,7 @@ class ClientHandler private constructor(private val clientAddress: InetSocketAdd
                 val nonNullableData: Data = data
                 output.write(nonNullableData.data)
                 blockNumber++ // Overflow is totally fine!
-            } while (nonNullableData.data.size == 512)
+            } while (nonNullableData.data.size == TFTP_DATA_MAX_LENGTH)
             sendMessage(Acknowledgment((blockNumber - 1u).toUShort()), clientAddress)
         }
     }

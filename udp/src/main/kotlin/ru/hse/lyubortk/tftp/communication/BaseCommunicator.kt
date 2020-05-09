@@ -45,7 +45,7 @@ abstract class BaseCommunicator : Closeable {
                     return
                 }
                 blockNumber++ // Overflow is totally fine!
-            } while (readBytes == 512)
+            } while (readBytes == TFTP_DATA_MAX_LENGTH)
         }
     }
 
