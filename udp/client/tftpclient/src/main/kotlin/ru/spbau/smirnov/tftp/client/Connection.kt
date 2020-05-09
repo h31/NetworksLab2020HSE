@@ -116,8 +116,7 @@ class Connection(
                 )
             )
         } catch (e: IOException) {
-            println("Something wrong with file: ${e.message}")
-            throw e
+            println("Something wrong with file or directory: ${e.message}")
         } finally {
             println("Finish $inetAddress $port ${if (isCompleted) "successfully" else "unsuccessfully"}")
             close()
