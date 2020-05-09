@@ -113,7 +113,7 @@ abstract class BaseCommunicator : Closeable {
     private fun printUnexpectedMessage(message: Message, remoteAddress: SocketAddress) {
         when (message) {
             is ErrorMessage -> System.err.println(
-                "Received error of type ${message.errorType.name}: ${message.errorMessage} from address $remoteAddress"
+                "Received error of type ${message.errorType.name}: '${message.errorMessage}' from address $remoteAddress"
             )
             else -> System.err.println(
                 "Received unexpected message of type ${message.javaClass.simpleName} from address $remoteAddress"

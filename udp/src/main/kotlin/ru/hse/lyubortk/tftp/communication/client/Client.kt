@@ -37,6 +37,7 @@ fun main(args: Array<String>) {
     println("method: $method, file: $fileName, ip: $serverIp, port: $serverPort, mode: $mode")
 
     val serverAddress = InetSocketAddress(serverIp, serverPort)
+    // not catching IO exceptions is ok because they will be printed to screen anyway
     Client(serverAddress).use {
         when (method) {
             "PUT" -> it.put(fileName, mode)
