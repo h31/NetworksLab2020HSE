@@ -4,12 +4,11 @@ import ru.hse.lyubortk.tftp.communication.BaseCommunicator
 import ru.hse.lyubortk.tftp.communication.withConversions
 import ru.hse.lyubortk.tftp.model.*
 import java.io.*
-import java.net.DatagramSocket
 import java.net.SocketAddress
 
 @kotlin.ExperimentalUnsignedTypes
 class ClientHandler private constructor(private val clientAddress: SocketAddress) : Closeable, BaseCommunicator() {
-    private fun run(request: Request, serverSocket: DatagramSocket) {
+    private fun run(request: Request) {
         try {
             when (request) {
                 is ReadRequest -> {
@@ -21,8 +20,7 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
                     if (!file.createNewFile()) {
                         sendMessage(
                             ErrorMessage(ErrorType.FILE_ALREADY_EXISTS, FILE_ALREADY_EXISTS_MESSAGE),
-                            clientAddress,
-                            serverSocket
+                            clientAddress
                         )
                         return
                     }
@@ -30,14 +28,10 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
                     receiveData(outputStream)
                 }
             }
-        } catch (e: FileNotFoundException) { // happened before acknowledgment
-            sendMessage(ErrorMessage(ErrorType.FILE_NOT_FOUND, e.message ?: ""), clientAddress, serverSocket)
+        } catch (e: FileNotFoundException) {
+            sendMessage(ErrorMessage(ErrorType.FILE_NOT_FOUND, e.message ?: ""), clientAddress)
         } catch (e: IOException) {
-            if (connectionEstablished) { // we should send error from main port if something breaks BEFORE the acknowledgment
-                sendMessage(ErrorMessage(ErrorType.ACCESS_VIOLATION, e.message ?: ""), clientAddress)
-            } else {
-                sendMessage(ErrorMessage(ErrorType.ACCESS_VIOLATION, e.message ?: ""), clientAddress, serverSocket)
-            }
+            sendMessage(ErrorMessage(ErrorType.ACCESS_VIOLATION, e.message ?: ""), clientAddress)
         }
     }
 
@@ -57,7 +51,6 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
                     return
                 }
 
-                connectionEstablished = true
                 val nonNullableData: Data = data
                 output.write(nonNullableData.data)
                 blockNumber++ // Overflow is totally fine!
@@ -67,11 +60,11 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
     }
 
     companion object ClientHandler {
-        fun start(clientAddress: SocketAddress, request: Request, serverSocket: DatagramSocket) {
+        fun start(clientAddress: SocketAddress, request: Request) {
             Thread {
                 try {
                     ClientHandler(clientAddress).use { clientHandler ->
-                        clientHandler.run(request, serverSocket)
+                        clientHandler.run(request)
                     }
                 } catch (e: Exception) {
                     System.err.println("Unhandled exception in ClientHandler: $e")

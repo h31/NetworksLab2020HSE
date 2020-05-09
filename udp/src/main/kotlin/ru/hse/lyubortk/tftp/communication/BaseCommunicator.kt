@@ -26,7 +26,6 @@ abstract class BaseCommunicator : Closeable {
             return thread
         }
     })
-    protected var connectionEstablished: Boolean = false
 
     protected fun sendData(inputStream: InputStream, remoteAddress: SocketAddress) {
         inputStream.use { input ->
@@ -44,7 +43,6 @@ abstract class BaseCommunicator : Closeable {
                     System.err.println(NO_ACKNOWLEDGMENT_MESSAGE)
                     return
                 }
-                connectionEstablished = true
                 blockNumber++ // Overflow is totally fine!
             } while (readBytes == 512)
         }
@@ -103,10 +101,6 @@ abstract class BaseCommunicator : Closeable {
     }
 
     protected fun sendMessage(message: Message, remoteAddress: SocketAddress) {
-        sendMessage(message, remoteAddress, socket)
-    }
-
-    protected fun sendMessage(message: Message, remoteAddress: SocketAddress, socket: DatagramSocket) {
         val bytes = Serializer.serialize(message)
         val packet = DatagramPacket(bytes, 0, bytes.size, remoteAddress)
         socket.send(packet)

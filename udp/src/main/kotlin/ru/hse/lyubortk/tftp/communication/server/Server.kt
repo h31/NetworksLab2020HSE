@@ -31,7 +31,7 @@ class Server(serverPort: Int) : Closeable {
             packet.socketAddress
             try {
                 when (val message = Deserializer.deserialize(packet.data.copyOf(packet.length))) {
-                    is Request -> ClientHandler.start(packet.socketAddress, message, socket)
+                    is Request -> ClientHandler.start(packet.socketAddress, message)
                     else -> sendError(
                         packet.socketAddress,
                         ErrorMessage(ILLEGAL_OPERATION, WRONG_MESSAGE_TYPE_ERROR)
