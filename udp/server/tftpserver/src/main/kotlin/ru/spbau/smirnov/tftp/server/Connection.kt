@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.server
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -19,14 +19,15 @@ class Connection(
 
     private val socket = DatagramSocket(Random.nextInt(1024, 65536))
     val rootPath = server.rootPath
-    private val timeout = 1000L
-    private val timesToSend = 5
+    private val timeout = 100L
+    private val timesToSend = 20
     private val bufferSize = 516
     /** True if we received all information that we need (but may be other side didn't receive ACK) */
     private var isCompleted = false
     @Volatile private var isFinished = false
     private var messageRoutine: SendMessageRoutine? = null
-    private var logic: ServerLogic = BeforeStartLogic(this)
+    private var logic: ServerLogic =
+        BeforeStartLogic(this)
 
     override fun run() {
         var lastMessage = firstMessage
@@ -39,33 +40,69 @@ class Connection(
                 val packet = DatagramPacket(buffer, buffer.size)
                 socket.receive(packet)
 
+                println("Received packet length ${packet.length}")
+
                 if (packet.address != inetAddress || packet.port != port) {
-                    sendError(Error(ErrorCode.NO_SUCH_USER, "Wrong address or port"), false, packet.address, packet.port)
+                    sendError(
+                        Error(
+                            ErrorCode.UNKNOWN_TRANSFER_ID,
+                            "Wrong address or port"
+                        ), false, packet.address, packet.port)
                     continue
                 }
 
                 lastMessage = PacketParser.parsePacket(packet)
             }
         } catch (e: NotTFTPMessage) {
-            sendError(Error(ErrorCode.ILLEGAL_OPERATION, e.brokenMessage.error))
+            sendError(
+                Error(
+                    ErrorCode.ILLEGAL_OPERATION,
+                    e.brokenMessage.error
+                )
+            )
         } catch (e: FileNotFound) {
-            sendError(Error(ErrorCode.FILE_NOT_FOUND, e.message!!))
+            sendError(
+                Error(
+                    ErrorCode.FILE_NOT_FOUND,
+                    e.message!!
+                )
+            )
         } catch (e: FileAlreadyExists) {
-            sendError(Error(ErrorCode.FILE_EXISTS, e.message!!))
+            sendError(
+                Error(
+                    ErrorCode.FILE_EXISTS,
+                    e.message!!
+                )
+            )
         } catch (e: ErrorMessage) {
             println("Received error message. Code: ${e.errorMessage.errorCode} message: ${e.errorMessage.errorMessage}")
         } catch (e: ReadAccessDenied) {
-            sendError(Error(ErrorCode.ACCESS_VIOLATION, e.message!!))
+            sendError(
+                Error(
+                    ErrorCode.ACCESS_VIOLATION,
+                    e.message!!
+                )
+            )
         } catch (e: FileReadError) {
-            sendError(Error(ErrorCode.NOT_DEFINED, e.message!!))
+            sendError(
+                Error(
+                    ErrorCode.NOT_DEFINED,
+                    e.message!!
+                )
+            )
         } catch (e: SocketException) {
-            if (!isFinished) {
+            if (!isCompleted) {
                 println("Connection broken\n${e.message}")
             }
         } catch (e: UnexpectedMessage) {
-            sendError(Error(ErrorCode.ILLEGAL_OPERATION, e.message!!))
+            sendError(
+                Error(
+                    ErrorCode.ILLEGAL_OPERATION,
+                    e.message!!
+                )
+            )
         } finally {
-            println("Finish $inetAddress $port")
+            println("Finish $inetAddress $port ${if (isCompleted) "Successfully" else "Unsuccessfully"}")
             close()
             logic.close()
             server.finishConnection(inetAddress, port)

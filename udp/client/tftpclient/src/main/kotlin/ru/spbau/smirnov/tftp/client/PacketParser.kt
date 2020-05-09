@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.client
 
 import org.apache.commons.net.io.FromNetASCIIInputStream
 import java.io.ByteArrayInputStream
@@ -16,14 +16,26 @@ object PacketParser {
         val data = packet.data.sliceArray(0 until packet.length)
 
         return try {
-            val (operationCode, tail) = readTwoByteInteger(data)
+            val (operationCode, tail) = readTwoByteInteger(
+                data
+            )
 
             when (operationCode) {
-                PARSE_REQUEST_CODE -> parseReadRequest(tail)
-                WRITE_REQUEST_CODE -> parseWriteRequest(tail)
-                DATA_CODE -> parseData(tail)
-                ACKNOWLEDGMENT_CODE -> parseAcknowledgment(tail)
-                ERROR_CODE -> parseError(tail)
+                PARSE_REQUEST_CODE -> parseReadRequest(
+                    tail
+                )
+                WRITE_REQUEST_CODE -> parseWriteRequest(
+                    tail
+                )
+                DATA_CODE -> parseData(
+                    tail
+                )
+                ACKNOWLEDGMENT_CODE -> parseAcknowledgment(
+                    tail
+                )
+                ERROR_CODE -> parseError(
+                    tail
+                )
                 else -> throw IllegalTFTPOperation("Unexpected operation type ${data[0]}${data[1]}")
             }
         } catch (e: IllegalTFTPOperation) {
@@ -35,12 +47,18 @@ object PacketParser {
 
     private fun parseReadRequest(request: ByteArray): ReadRequest {
         val (filename, mode) = readRequest(request)
-        return ReadRequest(filename, TFTPMode.valueOf(mode.toUpperCase()))
+        return ReadRequest(
+            filename,
+            TFTPMode.valueOf(mode.toUpperCase())
+        )
     }
 
     private fun parseWriteRequest(request: ByteArray): WriteRequest {
         val (filename, mode) = readRequest(request)
-        return WriteRequest(filename, TFTPMode.valueOf(mode.toUpperCase()))
+        return WriteRequest(
+            filename,
+            TFTPMode.valueOf(mode.toUpperCase())
+        )
     }
 
     private fun parseData(data: ByteArray): Data {
@@ -49,7 +67,9 @@ object PacketParser {
     }
 
     private fun parseAcknowledgment(acknowledgment: ByteArray): Acknowledgment {
-        val (block, emptyTail) = readTwoByteInteger(acknowledgment)
+        val (block, emptyTail) = readTwoByteInteger(
+            acknowledgment
+        )
         if (emptyTail.isNotEmpty()) {
             throw IllegalTFTPOperation("Unexpected bytes ${emptyTail.size}")
         }
@@ -65,7 +85,11 @@ object PacketParser {
         if (emptyTail.isNotEmpty()) {
             throw IllegalTFTPOperation("Unexpected bytes")
         }
-        return Error(ErrorCode.byCode(code), message)
+        return Error(
+            ErrorCode.byCode(
+                code
+            ), message
+        )
     }
 
     private fun readRequest(request: ByteArray): Pair<String, String> {

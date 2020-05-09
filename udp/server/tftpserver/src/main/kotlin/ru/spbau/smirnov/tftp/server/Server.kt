@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.server
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -29,11 +29,13 @@ class Server(
             }
 
             if ((packet.address to packet.port) in activeClients) {
+                // just ignore
                 continue
             }
 
             val message = PacketParser.parsePacket(packet)
-            val connection = Connection(packet.address, packet.port, this, message)
+            val connection =
+                Connection(packet.address, packet.port, this, message)
             activeClients.add(packet.address to packet.port)
 
             connection.start()

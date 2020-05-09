@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.server
 
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -21,10 +21,22 @@ class BeforeStartLogic(connection: Connection) : ServerLogic(connection) {
                 throw UnexpectedMessage("Acknowledgment received, but no RRQ operation in progress")
             }
             is ReadRequest -> {
-                connection.toNewState(ReadRequestLogic(connection, message.filename, message.mode))
+                connection.toNewState(
+                    ReadRequestLogic(
+                        connection,
+                        message.filename,
+                        message.mode
+                    )
+                )
             }
             is WriteRequest -> {
-                connection.toNewState(WriteRequestLogic(connection, message.filename, message.mode))
+                connection.toNewState(
+                    WriteRequestLogic(
+                        connection,
+                        message.filename,
+                        message.mode
+                    )
+                )
             }
             is Data -> {
                 throw UnexpectedMessage("Data received, but no WRQ operation in progress")
@@ -57,11 +69,7 @@ class ReadRequestLogic(
                 receiveAcknowledgment(message)
             }
             is ReadRequest -> {
-                if (lastSendBlock == 1 && filename == message.filename && mode == message.mode) {
-                    // just ignore, because we will retry sending first block
-                } else {
-                    throw UnexpectedMessage("RRQ in progress, but other RRQ was requested")
-                }
+                // just ignore
             }
             is WriteRequest -> {
                 throw UnexpectedMessage("RRQ is in progress, but WRQ was received")
@@ -102,6 +110,7 @@ class ReadRequestLogic(
             connection.stopCurrentSendRoutine()
             val leftToSend = lastSendBlock * blockSize
             if (leftToSend > sendArray.size) {
+                connection.markCompleted()
                 println("RRQ $filename finished")
                 connection.close()
                 return
@@ -114,7 +123,10 @@ class ReadRequestLogic(
 
     private fun sendBlock(firstByte: Int, lastByte: Int) {
         connection.sendMessageWithAcknowledgment(
-            Data(lastSendBlock, sendArray.sliceArray(firstByte until lastByte))
+            Data(
+                lastSendBlock,
+                sendArray.sliceArray(firstByte until lastByte)
+            )
         )
     }
 
@@ -157,11 +169,7 @@ class WriteRequestLogic(
                 throw UnexpectedMessage("WRQ is in progress, but RRQ was received")
             }
             is WriteRequest -> {
-                if (lastReceivedBlock == 0 && message.filename == filename && message.mode == mode) {
-                    connection.sendMessageWithoutAcknowledgment(Acknowledgment(0))
-                } else {
-                    throw UnexpectedMessage("WRQ is in progress, but WRQ was received")
-                }
+                // just ignore
             }
             is Data -> {
                 receiveData(message)
@@ -182,6 +190,7 @@ class WriteRequestLogic(
                 outputStream!!.write(message.data)
                 outputStream!!.flush()
                 if (message.data.size < blockSize) {
+                    connection.markCompleted()
                     // Wait some time if acknowledgment was lost
                     GlobalScope.launch {
                         delay(timeWaitAfterDone)
@@ -189,7 +198,11 @@ class WriteRequestLogic(
                     }
                 }
             }
-            connection.sendMessageWithoutAcknowledgment(Acknowledgment(message.block))
+            connection.sendMessageWithoutAcknowledgment(
+                Acknowledgment(
+                    message.block
+                )
+            )
         } catch (e: IOException) {
             println("Error writing to $filename\n${e.message}")
             throw FileWriteError("Some error while writing to $filename")
@@ -209,8 +222,8 @@ class WriteRequestLogic(
         if (!file.canWrite()) {
             throw WriteAccessDenied("$file is not writable")
         }
-        when (mode) {
-            TFTPMode.OCTET -> outputStream = file.outputStream()
+        outputStream = when (mode) {
+            TFTPMode.OCTET -> file.outputStream()
             TFTPMode.NETASCII -> FromNetASCIIOutputStream(file.outputStream())
         }
         connection.sendMessageWithoutAcknowledgment(Acknowledgment(0))

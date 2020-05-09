@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.server
 
 enum class ErrorCode(val code: Int) {
     NOT_DEFINED(0),

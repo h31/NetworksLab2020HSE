@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.client
 
 class FileNotFound(message: String) : Exception(message)
 class FileAlreadyExists(message: String) : Exception(message)

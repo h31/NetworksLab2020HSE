@@ -1,4 +1,4 @@
-package ru.spbau.smirnov.tftp
+package ru.spbau.smirnov.tftp.client
 
 import org.apache.commons.net.io.ToNetASCIIInputStream
 import java.io.ByteArrayInputStream
