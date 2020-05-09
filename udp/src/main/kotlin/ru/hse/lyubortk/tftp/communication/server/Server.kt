@@ -7,6 +7,7 @@ import ru.hse.lyubortk.tftp.model.ErrorType.ILLEGAL_OPERATION
 import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetSocketAddress
 import java.net.SocketAddress
 
 @ExperimentalUnsignedTypes
@@ -31,7 +32,7 @@ class Server(serverPort: Int) : Closeable {
             packet.socketAddress
             try {
                 when (val message = Deserializer.deserialize(packet.data.copyOf(packet.length))) {
-                    is Request -> ClientHandler.start(packet.socketAddress, message)
+                    is Request -> ClientHandler.start(InetSocketAddress(packet.address, packet.port), message)
                     else -> sendError(
                         packet.socketAddress,
                         ErrorMessage(ILLEGAL_OPERATION, WRONG_MESSAGE_TYPE_ERROR)

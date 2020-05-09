@@ -7,6 +7,7 @@ import java.io.Closeable
 import java.io.InputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -27,7 +28,7 @@ abstract class BaseCommunicator : Closeable {
         }
     })
 
-    protected fun sendData(inputStream: InputStream, remoteAddress: SocketAddress) {
+    protected fun sendData(inputStream: InputStream, remoteAddress: InetSocketAddress) {
         inputStream.use { input ->
             val bytes = ByteArray(TFTP_DATA_MAX_LENGTH)
             var blockNumber: UShort = 1u
@@ -50,9 +51,10 @@ abstract class BaseCommunicator : Closeable {
 
     protected fun <T : Message> sendMessageWithRetry(
         message: Message,
-        remoteAddress: SocketAddress,
+        remoteAddress: InetSocketAddress,
+        acceptOtherRemotePort: Boolean = false, // needed for client (server switches its port)
         responseValidation: (Message) -> T?
-    ): Pair<T, SocketAddress>? {
+    ): Pair<T, InetSocketAddress>? {
         val startTime = System.currentTimeMillis()
         fun getRemainingTime() = max(0, startTime + RESPONSE_TIMEOUT_MILLIS - System.currentTimeMillis())
 
@@ -75,7 +77,9 @@ abstract class BaseCommunicator : Closeable {
                 continue
             }
             val packet = futures[0].get()
-            if (packet.socketAddress != remoteAddress) { // this message is not from our client
+            if (packet.address != remoteAddress.address ||
+                (packet.port != remoteAddress.port && !acceptOtherRemotePort) // this message is not from our client
+            ) {
                 // Strange, but RFC says we should do this
                 sendMessage(ErrorMessage(ErrorType.UNKNOWN_TRANSFER_ID, UNKNOWN_TID_MESSAGE), packet.socketAddress)
                 continue
@@ -88,7 +92,7 @@ abstract class BaseCommunicator : Closeable {
             }
             val validatedMessage = responseValidation(receivedMessage)
             if (validatedMessage != null) {
-                return validatedMessage to packet.socketAddress // OK!
+                return validatedMessage to InetSocketAddress(packet.address, packet.port) // OK!
             }
             printUnexpectedMessage(receivedMessage, packet.socketAddress)
             if (receivedMessage is ErrorMessage) {

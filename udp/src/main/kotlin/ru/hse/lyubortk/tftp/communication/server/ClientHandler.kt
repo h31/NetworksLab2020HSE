@@ -4,10 +4,10 @@ import ru.hse.lyubortk.tftp.communication.BaseCommunicator
 import ru.hse.lyubortk.tftp.communication.withConversions
 import ru.hse.lyubortk.tftp.model.*
 import java.io.*
-import java.net.SocketAddress
+import java.net.InetSocketAddress
 
 @kotlin.ExperimentalUnsignedTypes
-class ClientHandler private constructor(private val clientAddress: SocketAddress) : Closeable, BaseCommunicator() {
+class ClientHandler private constructor(private val clientAddress: InetSocketAddress) : Closeable, BaseCommunicator() {
     private fun run(request: Request) {
         try {
             when (request) {
@@ -60,7 +60,7 @@ class ClientHandler private constructor(private val clientAddress: SocketAddress
     }
 
     companion object ClientHandler {
-        fun start(clientAddress: SocketAddress, request: Request) {
+        fun start(clientAddress: InetSocketAddress, request: Request) {
             Thread {
                 try {
                     ClientHandler(clientAddress).use { clientHandler ->

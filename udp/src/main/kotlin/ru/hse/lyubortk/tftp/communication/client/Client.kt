@@ -8,7 +8,6 @@ import ru.hse.lyubortk.tftp.model.*
 import java.io.File
 import java.io.OutputStream
 import java.net.InetSocketAddress
-import java.net.SocketAddress
 
 private fun printUsageAndThrowError(): Nothing {
     System.err.println("Cannot parse arguments")
@@ -48,11 +47,11 @@ fun main(args: Array<String>) {
 }
 
 @kotlin.ExperimentalUnsignedTypes
-class Client(private val serverAddress: SocketAddress) : BaseCommunicator() {
+class Client(private val serverAddress: InetSocketAddress) : BaseCommunicator() {
     fun put(fileName: String, mode: Mode) {
         val inputStream = File(fileName).inputStream().withConversions(mode)
 
-        val acknowledgmentAndAddress = sendMessageWithRetry(WriteRequest(fileName, mode), serverAddress) {
+        val acknowledgmentAndAddress = sendMessageWithRetry(WriteRequest(fileName, mode), serverAddress, true) {
             (it as? Acknowledgment)?.takeIf { acknowledgment ->
                 acknowledgment.blockNumber == 0.toUShort()
             }
@@ -76,7 +75,9 @@ class Client(private val serverAddress: SocketAddress) : BaseCommunicator() {
             fun validateDataMessage(message: Message): Data? =
                 (message as? Data)?.takeIf { data -> data.blockNumber == blockNumber }
 
-            val dataAndNewAddress = sendMessageWithRetry(readRequest, serverAddress) { validateDataMessage(it) }
+            val dataAndNewAddress = sendMessageWithRetry(readRequest, serverAddress, true) {
+                validateDataMessage(it)
+            }
             if (dataAndNewAddress == null) {
                 // Should not send error message to main server port
                 System.err.println(NO_DATA_MESSAGE)
@@ -88,7 +89,9 @@ class Client(private val serverAddress: SocketAddress) : BaseCommunicator() {
             blockNumber++ // Overflow is totally fine!
             var lastDataSize = firstDataMessage.data.size
             while (lastDataSize == TFTP_DATA_MAX_LENGTH) {
-                val data = sendMessageWithRetry(readRequest, serverAddress) { validateDataMessage(it) }?.first
+                val data = sendMessageWithRetry(Acknowledgment((blockNumber - 1u).toUShort()), remoteAddress) {
+                    validateDataMessage(it)
+                }?.first
                 if (data == null) {
                     sendMessage(ErrorMessage(ErrorType.NOT_DEFINED, NO_DATA_MESSAGE), remoteAddress)
                     System.err.println(NO_DATA_MESSAGE)
