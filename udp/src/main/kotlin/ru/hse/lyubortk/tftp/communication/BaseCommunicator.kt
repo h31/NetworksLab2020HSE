@@ -92,12 +92,12 @@ abstract class BaseCommunicator : Closeable {
             if (validatedMessage != null) {
                 return validatedMessage to packet.socketAddress // OK!
             }
+            printUnexpectedMessage(receivedMessage, packet.socketAddress)
             if (receivedMessage is ErrorMessage) {
                 //RFC states that error packet from correct remote address terminate the connection
                 return null
             }
             // probably old message
-            printUnexpectedMessage(receivedMessage, packet.socketAddress)
         }
         return null
     }
