@@ -39,8 +39,6 @@ class Connection(
                 val packet = DatagramPacket(buffer, buffer.size)
                 socket.receive(packet)
 
-                println("Received packet length ${packet.length}")
-
                 if (packet.address != inetAddress || packet.port != port) {
                     sendError(
                         Error(
