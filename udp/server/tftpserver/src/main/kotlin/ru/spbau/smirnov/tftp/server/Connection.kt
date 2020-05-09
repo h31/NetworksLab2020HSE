@@ -19,15 +19,14 @@ class Connection(
 
     private val socket = DatagramSocket(Random.nextInt(1024, 65536))
     val rootPath = server.rootPath
-    private val timeout = 100L
-    private val timesToSend = 20
+    private val timeout = 10L
+    private val timesToSend = 200
     private val bufferSize = 516
     /** True if we received all information that we need (but may be other side didn't receive ACK) */
     private var isCompleted = false
     @Volatile private var isFinished = false
     private var messageRoutine: SendMessageRoutine? = null
-    private var logic: ServerLogic =
-        BeforeStartLogic(this)
+    private var logic: ServerLogic = BeforeStartLogic(this)
 
     override fun run() {
         var lastMessage = firstMessage
@@ -121,21 +120,30 @@ class Connection(
         logic.handleMessage(message)
     }
 
-    private fun sendError(error: Error, blocking: Boolean = true, address: InetAddress = inetAddress, sendPort: Int = port) {
+    private fun sendError(
+        error: Error,
+        blocking: Boolean = true,
+        address: InetAddress = inetAddress,
+        sendPort: Int = port
+    ) {
         if (blocking) {
             runBlocking {
-                sendMessageWithoutAcknowledgment(error)
+                sendMessageWithoutAcknowledgment(error, address, sendPort)
             }
         } else {
             GlobalScope.launch {
-                sendMessageWithoutAcknowledgment(error)
+                sendMessageWithoutAcknowledgment(error, address, sendPort)
             }
         }
     }
 
-    fun sendMessageWithAcknowledgment(message: Message) {
+    fun sendMessageWithAcknowledgment(
+        message: Message,
+        address: InetAddress = inetAddress,
+        sendPort: Int = port
+    ) {
         val byteArrayMessage = message.toByteArray()
-        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, inetAddress, port)
+        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, address, sendPort)
         val routine = SendMessageRoutine(packet, timeout, timesToSend, socket)
         messageRoutine = routine
         GlobalScope.launch {
@@ -143,9 +151,13 @@ class Connection(
         }
     }
 
-    fun sendMessageWithoutAcknowledgment(message: Message) {
+    fun sendMessageWithoutAcknowledgment(
+        message: Message,
+        address: InetAddress = inetAddress,
+        sendPort: Int = port
+    ) {
         val byteArrayMessage = message.toByteArray()
-        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, inetAddress, port)
+        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, address, sendPort)
         try {
             socket.send(packet)
         } catch (e: SocketException) {

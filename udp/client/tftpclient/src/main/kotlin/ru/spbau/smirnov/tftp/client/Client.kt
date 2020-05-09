@@ -1,5 +1,6 @@
 package ru.spbau.smirnov.tftp.client
 
+import com.beust.jcommander.JCommander
 import java.net.InetAddress
 
 class Client(
@@ -7,7 +8,7 @@ class Client(
     private val rootPath: String,
     private val serverPort: Int
 ) {
-    private var currentMode = TFTPMode.NETASCII
+    private var currentMode = TFTPMode.OCTET
     private val serverAddress = InetAddress.getByName(host)
 
     fun run() {
@@ -64,9 +65,16 @@ class Client(
 }
 
 fun main(args: Array<String>) {
+    val arguments = Arguments()
+    JCommander.newBuilder()
+        .addObject(arguments)
+        .build()
+        .parse(*args)
+
     Client(
-        "localhost",
-        "",
-        6973
+        arguments.host,
+        arguments.rootPath,
+        arguments.port
     ).run()
 }
+

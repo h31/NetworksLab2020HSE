@@ -215,7 +215,6 @@ class ReadRequestLogic(
 
     private fun receiveData(message: Data) {
         try {
-            println("last received = $lastReceivedBlock, this = ${message.block}")
             if (message.block == lastReceivedBlock + 1) {
                 ++lastReceivedBlock
                 outputStream!!.write(message.data)
@@ -243,6 +242,7 @@ class ReadRequestLogic(
     override fun start() {
         println("Start WRQ $filename")
         val file = File("${connection.rootPath}$filename")
+        println("${connection.rootPath}${file.name}")
         try {
             file.createNewFile()
         } catch (e: SecurityException) {

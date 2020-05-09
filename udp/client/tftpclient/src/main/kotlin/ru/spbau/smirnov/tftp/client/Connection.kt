@@ -4,6 +4,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -19,8 +20,8 @@ class Connection(
 
     private val socket = DatagramSocket(Random.nextInt(1024, 65536))
     private var gotAddress = false
-    private val timeout = 100L
-    private val timesToSend = 20
+    private val timeout = 10L
+    private val timesToSend = 200
     private val bufferSize = 516
     private lateinit var logic: ClientLogic
     /** True if we received all information that we need (but may be other side didn't receive ACK) */
@@ -58,15 +59,15 @@ class Connection(
                 val packet = DatagramPacket(buffer, buffer.size)
                 socket.receive(packet)
 
-                println("Received packet length ${packet.length}")
-
                 if (gotAddress && (packet.address != inetAddress || packet.port != port)) {
                     sendError(
                         Error(
                             ErrorCode.UNKNOWN_TRANSFER_ID,
                             "Not a server"
                         ),
-                        false
+                        false,
+                        packet.address,
+                        packet.port
                     )
                 }
 
@@ -114,6 +115,9 @@ class Connection(
                     e.message!!
                 )
             )
+        } catch (e: IOException) {
+            println("Something wrong with file: ${e.message}")
+            throw e
         } finally {
             println("Finish $inetAddress $port ${if (isCompleted) "successfully" else "unsuccessfully"}")
             close()
@@ -134,14 +138,18 @@ class Connection(
         logic.handleMessage(message, address, port)
     }
 
-    private fun sendError(error: Error, blocking: Boolean = true, address: InetAddress = inetAddress, sendPort: Int = port) {
+    private fun sendError(message: Error) {
+        sendError(message, false, inetAddress, port)
+    }
+
+    private fun sendError(error: Error, blocking: Boolean = true, address: InetAddress, sendPort: Int) {
         if (blocking) {
             runBlocking {
-                sendMessageWithoutAcknowledgment(error)
+                sendMessageWithoutAcknowledgment(error, address, sendPort)
             }
         } else {
             GlobalScope.launch {
-                sendMessageWithoutAcknowledgment(error)
+                sendMessageWithoutAcknowledgment(error, address, sendPort)
             }
         }
     }
@@ -157,8 +165,12 @@ class Connection(
     }
 
     fun sendMessageWithoutAcknowledgment(message: Message) {
+        sendMessageWithoutAcknowledgment(message, inetAddress, port)
+    }
+
+    private fun sendMessageWithoutAcknowledgment(message: Message, address: InetAddress, port: Int) {
         val byteArrayMessage = message.toByteArray()
-        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, inetAddress, port)
+        val packet = DatagramPacket(byteArrayMessage, byteArrayMessage.size, address, port)
         try {
             socket.send(packet)
         } catch (e: SocketException) {
@@ -197,12 +209,11 @@ class Connection(
                 try {
                     socket.send(packet)
                 } catch (e: SocketException) {
-                    println("Socket exception while trying to send\n${e.message}")
+                    // ignored
                 }
                 delay(timeout)
             }
             if (!isSend) {
-                println("Have no accept. Closing connection")
                 close()
             }
         }

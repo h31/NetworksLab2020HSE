@@ -1,16 +1,27 @@
 package ru.spbau.smirnov.tftp.server
 
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.net.SocketException
+import com.beust.jcommander.JCommander
+import java.lang.System.exit
+import java.net.*
+import kotlin.system.exitProcess
 
 class Server(
-    val rootPath: String = "",
-    serverPort: Int = 69,
-    private val bufferSize: Int = 516
+    val rootPath: String,
+    serverPort: Int
 ) {
-    private val socket = DatagramSocket(serverPort)
+
+    private val bufferSize: Int = 516
+    private val socket: DatagramSocket
+
+    init {
+        try {
+            socket = DatagramSocket(serverPort)
+        } catch (e: BindException) {
+            println("Connecting to port $serverPort error: ${e.message}")
+            exitProcess(0)
+        }
+    }
+
     @Volatile private var isRunning = true
     private val activeClients = mutableSetOf<Pair<InetAddress, Int>>()
 
@@ -60,7 +71,17 @@ class Server(
 }
 
 fun main(args: Array<String>) {
-    val server = Server(serverPort = 6973)
+    val arguments = Arguments()
+    JCommander.newBuilder()
+        .addObject(arguments)
+        .build()
+        .parse(*args)
+
+    val server = Server(
+        arguments.rootPath,
+        arguments.port
+    )
+
     Thread { server.start() }.start()
     while (true) {
         readLine() ?: break
