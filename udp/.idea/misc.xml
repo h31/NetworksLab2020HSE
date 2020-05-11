@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CheckStyle-IDEA">
+    <option name="configuration">
+      <map>
+        <entry key="checkstyle-version" value="8.31" />
+        <entry key="copy-libs" value="false" />
+        <entry key="location-0" value="BUNDLED:(bundled):Sun Checks" />
+        <entry key="location-1" value="BUNDLED:(bundled):Google Checks" />
+        <entry key="scan-before-checkin" value="false" />
+        <entry key="scanscope" value="JavaOnly" />
+        <entry key="suppress-errors" value="false" />
+      </map>
+    </option>
+  </component>
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="FrameworkDetectionExcludesConfiguration">
+    <file type="web" url="file://$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="true" project-jdk-name="1.8" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+  <component name="SbtLocalSettings">
+    <option name="projectSyncType">
+      <map>
+        <entry key="$USER_HOME$/AAvazhnoe/IdeaProjects/scala-2019" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/1" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/1scala-2019-01-billing" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/2" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/2scala-2019-01-billing" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/3" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/3scala-2019-01-billing" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/4" value="PREVIEW" />
+        <entry key="$USER_HOME$/Видео/cheat/4scala-2019-01-billing" value="PREVIEW" />
+        <entry key="$PROJECT_DIR$/../../../cheat/LUB" value="PREVIEW" />
+        <entry key="$PROJECT_DIR$/../../../cheat/SMI" value="PREVIEW" />
+        <entry key="$PROJECT_DIR$/../../../cheat/ZUE" value="PREVIEW" />
+        <entry key="$PROJECT_DIR$/../../../cheat/epi" value="PREVIEW" />
+        <entry key="$PROJECT_DIR$/../../../cheat/sur" value="PREVIEW" />
+      </map>
+    </option>
+  </component>
+  <component name="ScalaSbtSettings">
+    <option name="customVMPath" />
+  </component>
+</project>
