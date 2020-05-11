@@ -1,8 +1,9 @@
-package ru.hse.anstkras.tftp
+package ru.hse.anstkras.tftp.packet
 
 import java.nio.ByteBuffer
 
-class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuffer) : Packet {
+class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuffer) :
+    Packet {
 
     //    2 bytes     2 bytes      string    1 byte
     //    -----------------------------------------

@@ -1,8 +1,10 @@
-package ru.hse.anstkras.tftp
+package ru.hse.anstkras.tftp.packet
 
+import ru.hse.anstkras.tftp.TFTPMode
 import java.nio.ByteBuffer
 
-class WRQPacket(private val fileName: String, private val mode: TFTPMode) : Packet {
+class WRQPacket(private val fileName: String, private val mode: TFTPMode) :
+    Packet {
 
     //           2 bytes    string   1 byte     string   1 byte
     //           -----------------------------------------------

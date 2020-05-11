@@ -1,4 +1,4 @@
-package ru.hse.anstkras.tftp
+package ru.hse.anstkras.tftp.packet
 
 import java.nio.ByteBuffer
 

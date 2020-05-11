@@ -1,7 +1,7 @@
 package ru.hse.anstkras.tftp
 
+import ru.hse.anstkras.tftp.packet.RRQPacket
 import java.net.*
-import java.nio.ByteBuffer
 
 class Client(private val host: String, private val port: Int, private val mode: TFTPMode) {
     private val inetSocketAddress = InetSocketAddress(host, port)

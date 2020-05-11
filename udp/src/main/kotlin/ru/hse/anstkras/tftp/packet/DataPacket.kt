@@ -1,8 +1,9 @@
-package ru.hse.anstkras.tftp
+package ru.hse.anstkras.tftp.packet
 
 import java.nio.ByteBuffer
 
-class DataPacket(private val blockNum: Int, private val data: ByteBuffer) : Packet {
+class DataPacket(private val blockNum: Int, private val data: ByteBuffer) :
+    Packet {
 
     //    2 bytes     2 bytes      n bytes
     //    ----------------------------------
