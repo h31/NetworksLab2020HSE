@@ -10,7 +10,7 @@ import java.net.DatagramSocket
 import java.net.SocketException
 import kotlin.system.exitProcess
 
-private const val USAGE_MESSAGE = "Usage: ./gradlew run [<portNumber>]"
+private const val USAGE_MESSAGE = "Usage: ./gradlew run [--args=\'<port>\']"
 
 fun main(argc: Array<String>) {
     if (argc.size > 1) {

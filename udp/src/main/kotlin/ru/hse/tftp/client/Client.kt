@@ -14,7 +14,7 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import kotlin.system.exitProcess
 
-private val USAGE_MESSAGE = "Usage: ./gradlew <read|write> <filename> <server ip> [port]"
+private val USAGE_MESSAGE = "Usage: ./gradlew run --args=\'<read|write> <filename> <server ip> [port]\'"
 
 fun printUsageMessage() {
     println(USAGE_MESSAGE)
