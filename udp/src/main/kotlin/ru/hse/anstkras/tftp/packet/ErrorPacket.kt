@@ -17,4 +17,16 @@ class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuff
         buffer.put(0)
         return buffer
     }
+
+    companion object : Parsable<Packet> {
+        override fun parse(byteBuffer: ByteBuffer): Packet {
+            val errorCode = byteBuffer.short
+            val errorMessage = PacketParser.parseStringToByteBuffer(byteBuffer)
+            return ErrorPacket(errorCode.toInt(), errorMessage)
+        }
+    }
+
+    fun getErrorMessage(): String {
+        return "ErrorCode: $errorCode, ${errorMessage.toString()}"
+    }
 }

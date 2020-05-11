@@ -1,5 +1,8 @@
 package ru.hse.anstkras.tftp.packet
 
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 
 class AckPacket(private val blockNum : Int) : Packet {
@@ -13,5 +16,12 @@ class AckPacket(private val blockNum : Int) : Packet {
         buffer.putShort(4)
         buffer.putShort(blockNum.toShort())
         return buffer
+    }
+
+    companion object : Parsable<Packet> {
+        override fun parse(byteBuffer: ByteBuffer): Packet {
+            val blockNum = byteBuffer.short
+            return AckPacket(blockNum.toInt())
+        }
     }
 }
