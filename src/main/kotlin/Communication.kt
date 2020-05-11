@@ -12,10 +12,11 @@ fun sendPacket(packet: Packet, socket: DatagramSocket, address: SocketAddress) {
     socket.send(DatagramPacket(bytes, bytes.size, address))
 }
 
+@ExperimentalUnsignedTypes
 fun waitAckPacket(blockNumber: UShort, socket: DatagramSocket, soTimeout: Int): Packet {
     while (true) { // try to get ackPacket
-        val ackDatagramBytes = ByteArray(4) // ACK packet size
-        val ackDatagramPacket = DatagramPacket(ackDatagramBytes, 4)
+        val ackDatagramBytes = ByteArray(516)
+        val ackDatagramPacket = DatagramPacket(ackDatagramBytes, 516)
         socket.soTimeout = soTimeout // A TFTP implementation MUST use an adaptive timeout.
         try {
             socket.receive(ackDatagramPacket)
@@ -60,14 +61,17 @@ fun sendFile(filename: String, mode: String, socketAddress: SocketAddress, sendS
             buffer.get(answerByteArray, 0, packetSize)
             val packetData = ByteBuffer.wrap(answerByteArray, 0, packetSize)
             val dataPacket = DataPacket(blockNumber, packetData)
-            var soTimeout = 100
-            while (soTimeout < 5 * 1000) {
+            var soTimeout = 1000
+            while (soTimeout < 10 * 1000) {
                 sendPacket(dataPacket, sendSocket, socketAddress)
+                System.err.println("Sending file")
                 when (val packet = waitAckPacket(blockNumber, sendSocket, soTimeout)) {
                     is AckPacket -> {
                         if (packetSize < 512) {
+                            System.err.println("File has sent")
                             return
                         }
+                        System.err.println("RRQ $filename DataPacket ${packet.blockNumber} has sent")
                         blockNumber = blockNumber.inc()
                         continue@mainLoop
                     }
@@ -123,9 +127,9 @@ fun receiveFile(
             }
             val dataPacket = parseDatagramPacket(receivePacket)
             if (dataPacket is DataPacket) {
-                System.err.println("WRQ $filename DataPacket received")
                 if (dataPacket.blockNumber == blockNumber) {
-                    sendPacket(AckPacket(dataPacket.blockNumber), socket, socketAddress)
+                    System.err.println("WRQ $filename DataPacket ${dataPacket.blockNumber} received")
+                    sendPacket(AckPacket(dataPacket.blockNumber), socket, receivePacket.socketAddress)
                     val data = dataPacket.data
                     val dataSize = data.remaining()
                     fileBuffer.put(data)
@@ -135,7 +139,7 @@ fun receiveFile(
                     }
                     blockNumber = blockNumber.inc()
                 } else if (dataPacket.blockNumber.toUShort() < blockNumber.toUShort()) {
-                    sendPacket(AckPacket(dataPacket.blockNumber), socket, socketAddress)
+                    sendPacket(AckPacket(dataPacket.blockNumber), socket, receivePacket.socketAddress)
                 }
             } else if (dataPacket is ErrorPacket) {
                 System.err.println(

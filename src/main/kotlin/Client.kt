@@ -4,18 +4,20 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.SocketAddress
 import java.nio.charset.StandardCharsets
+import java.nio.file.Paths
 import java.util.*
 
 @ExperimentalUnsignedTypes
 fun main(args: Array<String>) {
-    val scanner = Scanner(System.`in`)
-    println("Please enter host address:")
-    val address = scanner.nextLine().trim()
-    println("Please enter host port:")
-    val port = scanner.nextLine().trim().toInt()
+    if (args.size < 3) {
+        println("check README.MD")
+        return
+    }
+    val address = args[0]
+    val port = args[1].toInt()
     val socketAddress = InetSocketAddress(address, port)
-    println("Please enter mode(netascii or octet):")
-    val mode = scanner.nextLine().trim()
+    val mode = args[2].trim()
+    val scanner = Scanner(System.`in`)
     while (true) {
         when (scanner.nextLine()) {
             "get" -> {
