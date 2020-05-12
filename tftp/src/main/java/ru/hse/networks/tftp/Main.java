@@ -13,7 +13,7 @@ public class Main {
                 final var operation = args[3];
                 final var remoteFile = args[4];
                 final var file = new File(args[5]);
-                final var mode = Mode.valueOf(args[6]);
+                final var mode = Mode.valueOf(args[6].toUpperCase());
                 try {
                     var client = new Client(host, port);
                     if (operation.equals("read")) {
