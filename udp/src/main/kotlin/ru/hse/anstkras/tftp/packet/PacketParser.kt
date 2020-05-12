@@ -1,6 +1,5 @@
 package ru.hse.anstkras.tftp.packet
 
-import ru.hse.anstkras.tftp.Client
 import ru.hse.anstkras.tftp.MAX_PACKET_SIZE
 import java.nio.ByteBuffer
 

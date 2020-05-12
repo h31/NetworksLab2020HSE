@@ -14,23 +14,22 @@ const val MAX_PACKET_SIZE = 4 + TFTP_DATA_LENGTH
 
 enum class TFTPMode(val tftpName: String) {
     NETASCII("netascii") {
-        override fun modeStringRepresentation() = "netascii"
+        override fun modeStringRepresentation() = tftpName
     },
     OCTET("octet") {
-        override fun modeStringRepresentation() = "octet"
+        override fun modeStringRepresentation() = tftpName
     };
 
     abstract fun modeStringRepresentation(): String
 }
 
 fun getFile(socket: DatagramSocket, fileName: String) {
-    val resultBuffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
+    val resultBuffer = ByteBuffer.allocate(MAX_PACKET_SIZE * 100)
     socket.soTimeout = TIMEOUT
     var blockNum = 1
     while (!socket.isClosed) {
-        val dataPacketSize = MAX_PACKET_SIZE
         val buffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
-        val recievedPacket = DatagramPacket(buffer.array(), dataPacketSize)
+        val recievedPacket = DatagramPacket(buffer.array(), MAX_PACKET_SIZE)
         try {
             socket.receive(recievedPacket)
         } catch (e: SocketTimeoutException) {

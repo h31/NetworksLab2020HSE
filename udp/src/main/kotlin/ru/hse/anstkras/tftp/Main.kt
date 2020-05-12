@@ -20,10 +20,10 @@ fun main(args: Array<String>) {
                         client.writeFile(commandSplitted[1])
                     } else {
                         println(
-                            "usage: read/write filename\n" +
-                                    "exit"
+                            """
+                            usage: read/write filename
+                                   exit""".trimIndent()
                         )
-
                     }
                 }
             }
@@ -36,8 +36,7 @@ fun main(args: Array<String>) {
                 println("usage: ./tftp server port or ./tftp client host port mode")
             }
         }
-    } catch (e : Exception) {
+    } catch (e: Exception) {
         println("usage: ./tftp server port or ./tftp client host port mode")
-        e.printStackTrace()
     }
 }
