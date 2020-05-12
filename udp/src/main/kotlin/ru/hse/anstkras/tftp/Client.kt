@@ -11,34 +11,42 @@ class Client(private val host: String, private val port: Int, private val mode: 
     private val inetSocketAddress = InetSocketAddress(host, port)
 
     fun writeFile(fileName: String) {
-        val wrqPacket = WRQPacket(ByteBuffer.wrap(fileName.toByteArray()), mode) // TODO charset
+        val wrqPacket = WRQPacket(ByteBuffer.wrap(fileName.toByteArray()), mode)
         val socket = DatagramSocket()
         wrqPacket.send(socket, inetSocketAddress)
         val tftpPacket = Packet.getPacket(socket)
         if (tftpPacket !is AckPacket) {
-            error("error") // TODO
+            if (tftpPacket is ErrorPacket) {
+                System.err.println(tftpPacket.getErrorMessage())
+            } else {
+                System.err.println("Wrong type of packet received")
+            }
+            return
         } else {
             sendFile(fileName, socket, inetSocketAddress)
         }
     }
 
     fun readFile(fileName: String) {
-        val rrqPacket = RRQPacket(ByteBuffer.wrap(fileName.toByteArray()), mode) // TODO charset
+        val rrqPacket = RRQPacket(ByteBuffer.wrap(fileName.toByteArray()), mode)
         val socket = DatagramSocket()
         rrqPacket.send(socket, inetSocketAddress)
         getFile(socket, fileName)
+    }
+
+    companion object {
+        val timeout = 1000
+        val bufferCapacity = 1024
+        val tftpPackageSize = 512
     }
 }
 
 enum class TFTPMode(val tftpName: String) {
     NETASCII("netascii") {
         override fun modeStringRepresentation() = "netascii"
-
-
     },
     OCTET("octet") {
         override fun modeStringRepresentation() = "octet"
-
     };
 
     abstract fun modeStringRepresentation(): String
@@ -46,17 +54,17 @@ enum class TFTPMode(val tftpName: String) {
 
 fun getFile(socket: DatagramSocket, fileName: String) {
     try {
-        val resultBuffer = ByteBuffer.allocate(1024) // TODO
-        socket.soTimeout = 1024 // TODO choose this properly
+        val resultBuffer = ByteBuffer.allocate(Client.bufferCapacity)
+        socket.soTimeout = Client.timeout
         var blockNum = 1
         while (!socket.isClosed) {
             val dataPacketSize = 516
-            val buffer = ByteBuffer.allocate(1024) // TODO choose capacity
+            val buffer = ByteBuffer.allocate(Client.bufferCapacity)
             val recievedPacket = DatagramPacket(buffer.array(), dataPacketSize)
             try {
                 socket.receive(recievedPacket)
             } catch (e: SocketTimeoutException) {
-                error("Timeout") // TODO retransmit last package
+                error("Timeout")
             }
             val tftpPacket = PacketParser.parsePacket(ByteBuffer.wrap(recievedPacket.data, 0, recievedPacket.length))
             if (tftpPacket is ErrorPacket) {
@@ -73,12 +81,12 @@ fun getFile(socket: DatagramSocket, fileName: String) {
                 ackPacket.send(socket, recievedPacket.socketAddress)
                 val dataSize = tftpPacket.data.remaining()
                 resultBuffer.put(tftpPacket.data)
-                if (dataSize == 512) { // TODO magic const
+                if (dataSize == Client.tftpPackageSize) {
                     blockNum++
                 } else {
                     resultBuffer.flip()
                     val file = File(fileName)
-                    file.writeBytes(ByteArray(resultBuffer.remaining())) // TODO charsets
+                    file.writeBytes(ByteArray(resultBuffer.remaining()))
                 }
             }
         }
@@ -91,11 +99,10 @@ fun getFile(socket: DatagramSocket, fileName: String) {
 fun sendFile(fileName: String, socket: DatagramSocket, socketAddress: SocketAddress) {
     try {
         val fileBytes = File(fileName).readBytes()
-        // TODO charsets
         var blockNum = 1
         val buffer = ByteBuffer.wrap(fileBytes)
         while (!socket.isClosed) {
-            val bytesToSendSize = min(512, buffer.remaining())
+            val bytesToSendSize = min(Client.tftpPackageSize, buffer.remaining())
             val byteArrayToSend = ByteArray(bytesToSendSize)
             buffer.get(byteArrayToSend, 0, bytesToSendSize)
             val dataPacket = DataPacket(blockNum, ByteBuffer.wrap(byteArrayToSend))
@@ -106,14 +113,13 @@ fun sendFile(fileName: String, socket: DatagramSocket, socketAddress: SocketAddr
                 return
             }
             if (tftpPacket is AckPacket) {
-                if (bytesToSendSize < 512) { // TODO
+                if (bytesToSendSize < Client.tftpPackageSize) {
                     return
                 }
                 blockNum++
             }
-            // TODO handle timeout
         }
     } catch (e: IOException) {
-        // TODO handle
+        // TODO handle this
     }
 }

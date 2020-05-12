@@ -27,6 +27,6 @@ class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuff
     }
 
     fun getErrorMessage(): String {
-        return "ErrorCode: $errorCode, ${errorMessage.toString()}"
+        return "ErrorCode: $errorCode, $errorMessage"
     }
 }

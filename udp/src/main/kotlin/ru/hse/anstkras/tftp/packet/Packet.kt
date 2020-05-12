@@ -1,5 +1,6 @@
 package ru.hse.anstkras.tftp.packet
 
+import ru.hse.anstkras.tftp.Client
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketAddress
@@ -15,15 +16,15 @@ interface Packet {
     }
 
     companion object {
-        fun getPacket(socket : DatagramSocket) : Packet {
-            val ackPacketSize = 1024 // TODO size
-            val buffer = ByteBuffer.allocate(1024) // TODO choose capacity
+        fun getPacket(socket: DatagramSocket): Packet {
+            val ackPacketSize = Client.bufferCapacity
+            val buffer = ByteBuffer.allocate(Client.bufferCapacity)
             val recievedPacket = DatagramPacket(buffer.array(), ackPacketSize)
-            socket.soTimeout = 1024 // TODO
+            socket.soTimeout = Client.timeout
             try {
                 socket.receive(recievedPacket)
             } catch (e: SocketTimeoutException) {
-                error("Timeout") // TODO retransmit last package
+                error("Timeout")
             }
             val tftpPacket = PacketParser.parsePacket(ByteBuffer.wrap(recievedPacket.data, 0, recievedPacket.length))
             return tftpPacket

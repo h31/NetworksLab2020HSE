@@ -11,7 +11,6 @@ class WRQPacket(private val fileName: ByteBuffer, private val mode: TFTPMode) :
     //    WRQ   | 02 |  Filename  |   0  |    Mode    |   0  |
     //           -----------------------------------------------
     override fun getBytesRepresentation(): ByteBuffer {
-        // TODO кодировки
         val modeByteArray = mode.modeStringRepresentation().toByteArray()
         val buffer = ByteBuffer.allocate(fileName.remaining() + modeByteArray.size + 4)
         buffer.putShort(2)

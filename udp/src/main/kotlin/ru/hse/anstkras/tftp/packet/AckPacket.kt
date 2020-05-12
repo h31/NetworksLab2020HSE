@@ -1,11 +1,8 @@
 package ru.hse.anstkras.tftp.packet
 
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.SocketTimeoutException
 import java.nio.ByteBuffer
 
-class AckPacket(private val blockNum : Int) : Packet {
+class AckPacket(private val blockNum: Int) : Packet {
 
     //    2 bytes     2 bytes
     //    ---------------------
