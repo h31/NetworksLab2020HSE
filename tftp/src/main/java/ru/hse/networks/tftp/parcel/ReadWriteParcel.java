@@ -24,6 +24,10 @@ public abstract class ReadWriteParcel implements Parcel {
                 .flip();
     }
 
+    public String getFileName() {
+        return fileName;
+    }
+
     @Override
     public int size() {
         return 2 + fileName.length() + 1 + mode.name().length() + 1;

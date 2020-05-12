@@ -11,13 +11,14 @@ import java.util.Arrays;
 public class Client {
 
     private final int tid = TFTP.createTid();
-    private int remoteTid = TFTP.STANDARD_TID;
+    private int remoteTid;
     private final InetAddress host;
     private final TFTP tftp = new TFTP();
     private final DatagramSocket socket = new DatagramSocket(tid);
 
-    public Client(String host) throws UnknownHostException, SocketException {
+    public Client(String host, int port) throws UnknownHostException, SocketException {
         this.host = InetAddress.getByName(host);
+        remoteTid = port;
     }
 
     /**
