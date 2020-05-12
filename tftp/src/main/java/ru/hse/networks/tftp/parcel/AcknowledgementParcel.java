@@ -10,6 +10,10 @@ final public class AcknowledgementParcel implements Parcel {
         this.blockNumber = blockNumber;
     }
 
+    public short getBlockNumber() {
+        return blockNumber;
+    }
+
     static public AcknowledgementParcel fromBytes(ByteBuffer buffer) {
         final var blockNumber = buffer.getShort();
         return new AcknowledgementParcel(blockNumber);

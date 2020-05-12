@@ -22,6 +22,7 @@ public class Main {
                         var result = client.send(remoteFile, file, mode);
                         System.out.println(result);
                     }
+                    return;
                 } catch (Throwable e) {
                     e.printStackTrace();
                 }

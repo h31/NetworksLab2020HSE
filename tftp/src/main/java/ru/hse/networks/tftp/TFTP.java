@@ -1,15 +1,14 @@
 package ru.hse.networks.tftp;
 
+import ru.hse.networks.tftp.parcel.AcknowledgementParcel;
 import ru.hse.networks.tftp.parcel.ByteBufferUtils;
 import ru.hse.networks.tftp.parcel.Parcel;
-import ru.hse.networks.tftp.parcel.ParcelFactory;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
 import java.util.Random;
 
 final public class TFTP {
@@ -50,5 +49,9 @@ final public class TFTP {
         socket.setSoTimeout(TIMEOUT_MS);
         socket.receive(packet);
         return packet;
+    }
+
+    public void sendAcknowledgement(short blockNumber, DatagramSocket socket, InetAddress host, int port) {
+        send(new AcknowledgementParcel(blockNumber), socket, host, port);
     }
 }
