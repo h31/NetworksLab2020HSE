@@ -2,8 +2,9 @@ package ru.hse.anstkras.tftp.packet
 
 import ru.hse.anstkras.tftp.TFTPMode
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
-class RRQPacket(private val fileName: ByteBuffer, private val mode: TFTPMode) :
+class RRQPacket(val fileName: ByteBuffer, val mode: TFTPMode) :
     Packet {
 
     //           2 bytes    string   1 byte     string   1 byte
@@ -24,7 +25,7 @@ class RRQPacket(private val fileName: ByteBuffer, private val mode: TFTPMode) :
     companion object : Parsable<Packet> {
         override fun parse(byteBuffer: ByteBuffer): Packet {
             val fileName = PacketParser.parseStringToByteBuffer(byteBuffer)
-            val mode = TFTPMode.valueOf(PacketParser.parseStringToByteBuffer(byteBuffer).toString().toUpperCase())
+            val mode = TFTPMode.valueOf(StandardCharsets.US_ASCII.decode(PacketParser.parseStringToByteBuffer(byteBuffer)).toString().toUpperCase())
 
             return RRQPacket(fileName, mode)
         }

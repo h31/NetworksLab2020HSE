@@ -16,11 +16,11 @@ interface Packet {
     }
 
     companion object {
-        fun getPacket(socket: DatagramSocket): Packet {
+        fun getPacket(socket: DatagramSocket, timeout: Int): Packet {
             val ackPacketSize = Client.bufferCapacity
             val buffer = ByteBuffer.allocate(Client.bufferCapacity)
             val recievedPacket = DatagramPacket(buffer.array(), ackPacketSize)
-            socket.soTimeout = Client.timeout
+            socket.soTimeout = timeout
             try {
                 socket.receive(recievedPacket)
             } catch (e: SocketTimeoutException) {

@@ -1,5 +1,6 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.4-M1'
+    id 'application'
 }
 
 group 'org.example'
@@ -9,6 +10,8 @@ repositories {
     maven { url 'https://dl.bintray.com/kotlin/kotlin-eap' }
     mavenCentral()
 }
+
+mainClassName = 'ru.hse.anstkras.tftp.MainKt'
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
@@ -20,3 +23,8 @@ compileKotlin {
 compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
+
+run {
+    standardInput = System.in
+}
+

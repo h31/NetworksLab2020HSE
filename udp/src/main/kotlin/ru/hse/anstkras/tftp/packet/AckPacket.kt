@@ -8,10 +8,11 @@ class AckPacket(private val blockNum: Int) : Packet {
     //    ---------------------
     //    | Opcode |   Block #  |
     //    ---------------------
+    @ExperimentalUnsignedTypes
     override fun getBytesRepresentation(): ByteBuffer {
         val buffer = ByteBuffer.allocate(4)
         buffer.putShort(4)
-        buffer.putShort(blockNum.toShort())
+        buffer.putShort(blockNum.toUShort().toShort())
         return buffer
     }
 

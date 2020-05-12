@@ -9,10 +9,11 @@ class DataPacket(val blockNum: Int, val data: ByteBuffer) :
     //    ----------------------------------
     //    | Opcode |   Block #  |   Data     |
     //    ----------------------------------
+    @OptIn(ExperimentalUnsignedTypes::class)
     override fun getBytesRepresentation(): ByteBuffer {
         val buffer = ByteBuffer.allocate(4 + data.remaining())
         buffer.putShort(3)
-        buffer.putShort(blockNum.toShort())
+        buffer.putShort(blockNum.toUShort().toShort())
         buffer.put(data)
         return buffer
     }
