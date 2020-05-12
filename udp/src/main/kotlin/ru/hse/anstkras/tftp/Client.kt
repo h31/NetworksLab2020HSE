@@ -34,7 +34,7 @@ class Client(private val host: String, private val port: Int, private val mode: 
     }
 
     companion object {
-        val timeout = 1000
+        val timeout = 10000
         val bufferCapacity = 1024
         val tftpPackageSize = 512
     }
@@ -85,6 +85,7 @@ fun getFile(socket: DatagramSocket, fileName: String) {
                 resultBuffer.flip()
                 val file = File(fileName)
                 file.writeBytes(ByteArray(resultBuffer.remaining()))
+                break
             }
         }
     }
