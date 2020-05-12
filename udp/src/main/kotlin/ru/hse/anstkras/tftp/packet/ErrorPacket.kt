@@ -1,6 +1,7 @@
 package ru.hse.anstkras.tftp.packet
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuffer) :
     Packet {
@@ -27,15 +28,19 @@ class ErrorPacket(private val errorCode: Int, private val errorMessage: ByteBuff
         }
 
         fun getFileNotFoundPacket(): ErrorPacket {
-            return ErrorPacket(1, ByteBuffer.wrap("File not found".toByteArray()))
+            return ErrorPacket(1, ByteBuffer.wrap("File not found".toByteArray(StandardCharsets.US_ASCII)))
         }
 
-        fun getUndefinedErrorPacket(message: String) : ErrorPacket {
-            return ErrorPacket(0, ByteBuffer.wrap(message.toByteArray()))
+        fun getUndefinedErrorPacket(message: String): ErrorPacket {
+            return ErrorPacket(0, ByteBuffer.wrap(message.toByteArray(StandardCharsets.US_ASCII)))
         }
     }
 
     fun getErrorMessage(): String {
-        return "ErrorCode: $errorCode, $errorMessage"
+        return "ErrorCode: $errorCode, ${StandardCharsets.US_ASCII.decode(
+            PacketParser.parseStringToByteBuffer(
+                errorMessage
+            )
+        )}"
     }
 }

@@ -1,6 +1,7 @@
 package ru.hse.anstkras.tftp.packet
 
 import ru.hse.anstkras.tftp.Client
+import ru.hse.anstkras.tftp.MAX_PACKET_SIZE
 import java.nio.ByteBuffer
 
 class PacketParser {
@@ -18,7 +19,7 @@ class PacketParser {
         }
 
         fun parseStringToByteBuffer(buffer: ByteBuffer): ByteBuffer {
-            val resultBuffer = ByteBuffer.allocate(Client.bufferCapacity)
+            val resultBuffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
             while (buffer.hasRemaining()) {
                 val b = buffer.get()
                 if (b == 0.toByte()) {

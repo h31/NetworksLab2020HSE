@@ -1,6 +1,6 @@
 package ru.hse.anstkras.tftp.packet
 
-import ru.hse.anstkras.tftp.Client
+import ru.hse.anstkras.tftp.MAX_PACKET_SIZE
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.SocketAddress
@@ -17,8 +17,8 @@ interface Packet {
 
     companion object {
         fun getPacket(socket: DatagramSocket, timeout: Int): Packet {
-            val ackPacketSize = Client.bufferCapacity
-            val buffer = ByteBuffer.allocate(Client.bufferCapacity)
+            val ackPacketSize = MAX_PACKET_SIZE
+            val buffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
             val recievedPacket = DatagramPacket(buffer.array(), ackPacketSize)
             socket.soTimeout = timeout
             try {

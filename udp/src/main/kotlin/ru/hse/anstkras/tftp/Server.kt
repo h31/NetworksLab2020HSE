@@ -13,8 +13,8 @@ class Server(private val port: Int) {
     fun start() {
         val socket = DatagramSocket(port)
         while (true) {
-            val ackPacketSize = Client.bufferCapacity
-            val buffer = ByteBuffer.allocate(Client.bufferCapacity)
+            val ackPacketSize = MAX_PACKET_SIZE
+            val buffer = ByteBuffer.allocate(MAX_PACKET_SIZE)
             val recievedPacket = DatagramPacket(buffer.array(), ackPacketSize)
             socket.receive(recievedPacket)
             val tftpPacket = PacketParser.parsePacket(ByteBuffer.wrap(recievedPacket.data, 0, recievedPacket.length))
