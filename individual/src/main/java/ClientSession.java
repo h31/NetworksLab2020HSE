@@ -32,6 +32,22 @@ public class ClientSession extends Session {
         dstFile = options.getOptionValues("operation")[2];
     }
 
+    public void run() {
+        try {
+            switch (sessionType) {
+                case RRQ:
+                    handleRRQ();
+                    break;
+                case WRQ:
+                    handleWRQ();
+                    break;
+            }
+        } catch (TftpException | IOException e) {
+            e.printStackTrace();
+        }
+        close();
+    }
+
     @Override
     protected void handleRRQ() throws IOException, TftpException {
         var request = sendRRQ(new ReadPacket(srcFile, mode));
@@ -108,21 +124,6 @@ public class ClientSession extends Session {
                         handleUnexpected(packet);
                 }
             }
-        }
-    }
-
-    public void run() {
-        try {
-            switch (sessionType) {
-                case RRQ:
-                    handleRRQ();
-                    break;
-                case WRQ:
-                    handleWRQ();
-                    break;
-            }
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
         }
     }
 }

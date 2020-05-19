@@ -1,6 +1,5 @@
 import requests.*;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -8,7 +7,7 @@ import java.net.SocketException;
 
 import static parameters.ErrorCode.UNKNOWN_TID;
 
-public abstract class Session implements Closeable {
+public abstract class Session {
 
     private final TftpSocket tftpSocket;
     protected short blockNumber = 0;
@@ -72,7 +71,6 @@ public abstract class Session implements Closeable {
         return tftpSocket.validate(response);
     }
 
-    @Override
     public void close() {
         tftpSocket.close();
     }

@@ -1,13 +1,12 @@
 import requests.Packet;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 
 import static parameters.TftpPacketInfo.PACKET_MAX_LENGTH;
 
-class TftpSocket implements Closeable {
+class TftpSocket {
     private static final int DEFAULT_TIMEOUT_MS = 5000;
     private static final int DEFAULT_ATTEMPTS = 5;
 
@@ -53,7 +52,6 @@ class TftpSocket implements Closeable {
         return datagramPacket;
     }
 
-    @Override
     public void close() {
         socket.close();
     }

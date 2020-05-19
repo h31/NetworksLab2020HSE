@@ -37,6 +37,7 @@ public class ServerSession extends Session implements Runnable {
                 System.out.println(String.format("Failed to send ErrorPacket: %s", errorPacket.getMessage()));
             }
         }
+        close();
     }
 
     @Override
