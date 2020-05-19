@@ -1,15 +1,15 @@
 package requests;
 
-import fields.OpCode;
-
 import java.nio.ByteBuffer;
+
+import static parameters.OpCode.ACK;
 
 public class AckPacket extends Packet {
 
     private final short blockNumber;
 
     public AckPacket(short blockNumber) {
-        super(OpCode.ACK);
+        super(ACK);
         this.blockNumber = blockNumber;
     }
 
@@ -18,11 +18,15 @@ public class AckPacket extends Packet {
         return Character.BYTES + Character.BYTES;
     }
 
+    public short getBlockNumber() {
+        return blockNumber;
+    }
+
     @Override
     public byte[] serialize() {
         ByteBuffer buf = ByteBuffer.allocate(size());
         buf.putShort(getOpCode());
-        buf.putChar((char)blockNumber);
+        buf.putChar((char) blockNumber);
         return buf.array();
     }
 }

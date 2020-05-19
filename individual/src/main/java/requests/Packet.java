@@ -10,6 +10,7 @@ public abstract class Packet {
     public short getOpCode() {
         return opCode;
     }
+
     public abstract int size();
 
     public abstract byte[] serialize();
