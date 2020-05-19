@@ -43,26 +43,25 @@ public class ServerSession extends Session implements Runnable {
     protected void handleRRQ() throws IOException, TftpException {
         var readPacket = (ReadPacket) PacketFactory.create(request);
         blockNumber = 1;
+
         try (var fileReader = new FileReader(readPacket.getMode(), readPacket.getFilename())) {
             loop:
             while (true) {
                 request = sendData(fileReader.read());
-
                 var response = receive(request);
+
                 if (validate(response)) {
                     continue;
                 }
                 var packet = PacketFactory.create(response);
-
                 switch (packet.getOpCode()) {
                     case ACK:
                         var ackPacket = (AckPacket) packet;
                         if (ackPacket.getBlockNumber() == blockNumber) {
-                            handleAck(ackPacket);
+                            ++blockNumber;
                             if (isLastPacket) {
                                 return;
                             }
-                            request = sendData(fileReader.read());
                             continue loop;
                         }
                         break;
@@ -78,6 +77,8 @@ public class ServerSession extends Session implements Runnable {
     @Override
     protected void handleWRQ() throws IOException, TftpException {
         var writePacket = (WritePacket) PacketFactory.create(request);
+        sendAck();
+        ++blockNumber;
 
         try (var fileWriter = new FileWriter(writePacket.getMode(), writePacket.getFilename())) {
             loop:
@@ -97,6 +98,7 @@ public class ServerSession extends Session implements Runnable {
                         if (dataPacket.getBlockNumber() == blockNumber) {
                             handleData(dataPacket, fileWriter);
                             request = sendAck();
+                            ++blockNumber;
                             continue loop;
                         }
                         break;

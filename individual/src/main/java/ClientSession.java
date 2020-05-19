@@ -10,9 +10,7 @@ import static parameters.OpCode.*;
 
 public class ClientSession extends Session {
 
-    // Session information
     private final short sessionType;
-    // File information
     private final String srcFile;
     private final String dstFile;
     private final String mode;
@@ -38,12 +36,13 @@ public class ClientSession extends Session {
     protected void handleRRQ() throws IOException, TftpException {
         var request = sendRRQ(new ReadPacket(srcFile, mode));
         blockNumber = 1;
+
         try (var fileWriter = new FileWriter(mode, dstFile)) {
             loop:
             while (!isLastPacket) {
                 var response = receive(request);
 
-                if (!validate(response)) {
+                if (established && !validate(response)) {
                     handleUnknown(response);
                     continue;
                 }
@@ -55,10 +54,11 @@ public class ClientSession extends Session {
                         var dataPacket = (DataPacket) packet;
                         if (dataPacket.getBlockNumber() == blockNumber) {
                             if (blockNumber == 1) {
-                                handleAccept(response);
+                                establishConnection(response);
                             }
                             handleData(dataPacket, fileWriter);
                             request = sendAck();
+                            ++blockNumber;
                             continue loop;
                         }
                         break;
@@ -80,7 +80,7 @@ public class ClientSession extends Session {
             while (true) {
                 var response = receive(request);
 
-                if (!validate(response)) {
+                if (established && !validate(response)) {
                     handleUnknown(response);
                     continue;
                 }
@@ -92,9 +92,9 @@ public class ClientSession extends Session {
                         var ackPacket = (AckPacket) packet;
                         if (ackPacket.getBlockNumber() == blockNumber) {
                             if (blockNumber == 0) {
-                                handleAccept(response);
+                                establishConnection(response);
                             }
-                            handleAck(ackPacket);
+                            ++blockNumber;
                             if (isLastPacket) {
                                 return;
                             }

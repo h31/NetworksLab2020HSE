@@ -9,10 +9,8 @@ public class FileWriter implements Closeable {
     static final byte LF = 0x0A;
 
     private final OutputStream stream;
-    private final File file;
 
     public FileWriter(String mode, String filename) throws FileNotFoundException, TftpException {
-        file = new File(filename);
         switch (mode) {
             case NETASCII:
                 this.stream = new NetASCIIOutputStream(filename);
@@ -28,7 +26,6 @@ public class FileWriter implements Closeable {
     @Override
     public void close() throws IOException {
         stream.close();
-        file.delete();
     }
 
     public void write(byte[] data) throws IOException {
@@ -54,12 +51,11 @@ public class FileWriter implements Closeable {
                 case LF:
                     if (lastWasCR) {
                         out.write(CR);
-                        out.write(LF);
                         lastWasCR = false;
                         break;
                     }
-                    lastWasCR = false;
                     out.write(LF);
+                    lastWasCR = false;
                     break;
                 default:
                     if (lastWasCR) {

@@ -29,7 +29,7 @@ public class ReadPacket extends Packet {
     @Override
     public byte[] serialize() {
         ByteBuffer buf = ByteBuffer.allocate(size());
-        buf.putInt(getOpCode());
+        buf.putShort(getOpCode());
         buf.put(filename.getBytes());
         buf.put((byte) 0);
         buf.put(mode.getBytes());

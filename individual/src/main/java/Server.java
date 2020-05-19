@@ -15,8 +15,10 @@ public class Server {
     public void start() {
         try (var socket = new TftpAcceptSocket(port)) {
             while (true) {
-                pool.execute(new ServerSession(socket.accept()));
-                Thread.sleep(3000);
+                try(var session = new ServerSession(socket.accept())) {
+                    pool.execute(session);
+                    Thread.sleep(3000);
+                }
             }
         } catch (Exception e) {
             pool.shutdownNow();

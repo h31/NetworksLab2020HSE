@@ -12,8 +12,8 @@ public class Client {
     }
 
     public void start() {
-        try {
-            new ClientSession(options).run();
+        try (var session = new ClientSession(options)) {
+            session.run();
         } catch (SocketException | UnknownHostException e) {
             e.printStackTrace();
         }

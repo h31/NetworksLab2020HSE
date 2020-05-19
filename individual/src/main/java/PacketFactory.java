@@ -22,7 +22,9 @@ public class PacketFactory {
     }
 
     private static byte[] getData(ByteBuffer buffer) {
-        return buffer.array();
+        byte[] b = new byte[buffer.remaining()];
+        buffer.get(b);
+        return b;
     }
 
     public static Packet create(DatagramPacket packet) throws TftpException {

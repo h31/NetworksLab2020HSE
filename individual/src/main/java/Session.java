@@ -1,5 +1,6 @@
 import requests.*;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
@@ -7,11 +8,12 @@ import java.net.SocketException;
 
 import static parameters.ErrorCode.UNKNOWN_TID;
 
-public abstract class Session {
+public abstract class Session implements Closeable {
 
     private final TftpSocket tftpSocket;
     protected short blockNumber = 0;
     protected boolean isLastPacket = false;
+    protected boolean established = false;
 
     public Session(InetAddress address, int port) throws SocketException {
         this.tftpSocket = new TftpSocket(address, port);
@@ -33,21 +35,15 @@ public abstract class Session {
     protected void handleData(DataPacket packet, FileWriter fileWriter) throws IOException {
         isLastPacket = packet.isLastPacket();
         fileWriter.write(packet.getData());
-        ++blockNumber;
     }
 
     protected DatagramPacket sendAck() throws IOException {
         return tftpSocket.send(new AckPacket(blockNumber));
     }
 
-    protected void handleAck(AckPacket packet) {
-        if (packet.getBlockNumber() == blockNumber) {
-            ++blockNumber;
-        }
-    }
-
-    protected void handleAccept(DatagramPacket response) {
-        tftpSocket.accept(response.getPort());
+    protected void establishConnection(DatagramPacket response) {
+        established = true;
+        tftpSocket.establish(response.getPort());
     }
 
     protected DatagramPacket sendData(byte[] data) throws IOException {
@@ -74,6 +70,11 @@ public abstract class Session {
 
     protected boolean validate(DatagramPacket response) {
         return tftpSocket.validate(response);
+    }
+
+    @Override
+    public void close() {
+        tftpSocket.close();
     }
 
     protected abstract void handleRRQ() throws IOException, TftpException;

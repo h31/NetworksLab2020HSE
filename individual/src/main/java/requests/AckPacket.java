@@ -26,7 +26,7 @@ public class AckPacket extends Packet {
     public byte[] serialize() {
         ByteBuffer buf = ByteBuffer.allocate(size());
         buf.putShort(getOpCode());
-        buf.putChar((char) blockNumber);
+        buf.putShort(blockNumber);
         return buf.array();
     }
 }

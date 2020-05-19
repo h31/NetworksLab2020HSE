@@ -24,7 +24,7 @@ class TftpSocket implements Closeable {
         this.dstPort = dstPort;
     }
 
-    public void accept(int newDstPort) {
+    public void establish(int newDstPort) {
         dstPort = newDstPort;
     }
 
