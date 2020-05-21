@@ -11,9 +11,6 @@
 #include <csignal>
 #include <cstring>
 
-static const int MAX_PORT = 65535;
-static const int MIN_PORT = 1024;
-
 static const int AUTH_OP = 0;
 static const int TEXT_OP = 1;
 static const int SERVER_MSG_OP = 2;
@@ -34,7 +31,9 @@ static void receive_sigint(int signum) {
 static uint16_t str_to_port(std::string &port_str) {
     size_t end_pos = 0;
     int port = std::stoi(port_str, &end_pos);
-    if (port < MIN_PORT || port > MAX_PORT || end_pos != port_str.size()) {
+    if (port < std::numeric_limits<uint16_t>::min() ||
+        port > std::numeric_limits<uint16_t>::max() ||
+        end_pos != port_str.size()) {
         throw std::invalid_argument("invalid port string");
     }
     return port;
@@ -201,7 +200,7 @@ int main(int argc, char *argv[]) {
         std::string port_string = argv[1];
         port = str_to_port(port_string);
     } catch (const std::exception &e) {
-        std::cerr << "could not parse server port. Check that provided argument is an integer in [1024, 65545] range"
+        std::cerr << "could not parse server port. Check that provided argument is an integer in [0, 65535] range"
                   << std::endl;
         return 1;
     }
