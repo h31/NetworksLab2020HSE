@@ -10,13 +10,149 @@
 
 #include <protocol_utils.h>
 #include <pthread.h>
+
+int pipe_fd[2];
+// pthread_mutex_t pipe_lock;
+
+#define SET_SIZE 256
+
+struct ConnectionsSet_t {
+    pthread_mutex_t lock;
+    size_t size;
+    int sockets[SET_SIZE];
+};
+typedef struct ConnectionsSet_t ConnectionsSet;
+
+void init_set(ConnectionsSet *set) {
+    pthread_mutex_init(&set->lock, NULL);
+    set->size = 0;
+    memset(set->sockets, -1, SET_SIZE * sizeof(int));
+}
+
+void add(ConnectionsSet *set, int new_socket) {
+    pthread_mutex_lock(&set->lock);
+    set->sockets[set->size++] = new_socket;
+    pthread_mutex_unlock(&set->lock);
+}
+
+
+void *sending(void* conn_set) {
+    ConnectionsSet *connections = (ConnectionsSet *) conn_set;
+    printf("start sending..\n");
+    while (1) {
+        message *msg = NULL;
+        // char pointer_buffer[sizeof(message*)];
+        int nread = 0;
+        nread = read(pipe_fd[0], &msg, sizeof(message*));
+        // sscanf(pointer_buffer, "%p\n", &msg);
+        if (nread == -1) {
+            continue;
+        }
+        // printf("EEEE");
+        if (msg == NULL) {
+            // printf("aaaaaaa %i\n", nread);
+            break;
+        }
+        char buffer[BUFFER_SIZE];
+        size_t msg_len = serialize_msg(msg, buffer);
+
+        pthread_mutex_lock(&connections->lock);
+        int empty_i = -1;
+
+        struct tm *timeinfo = localtime(&msg->tm);
+        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg->name, msg->text);
+        fflush(stdout);
+        
+        size_t len = connections->size;
+        // printf("%lu\n", len);
+        for (size_t i = 0; i < len; i++) {
+            if (send_bytes(connections->sockets[i], buffer, msg_len) > 0) {
+                if (empty_i != -1) {
+                    connections->sockets[empty_i++] = connections->sockets[i];
+                } 
+                // printf("OK\n");
+            } else {
+                // printf("WA\n");
+                if (empty_i == -1) {
+                    empty_i = i;
+                }
+                --connections->size;
+                // printf("WAAA\n");
+
+            }
+        }
+        pthread_mutex_unlock(&connections->lock);
+        free(msg);
+    }
+    return NULL;
+}
+
+void *connection_handler(void *sct) {
+    int socket = (int) sct;
+
+    // char name[BUFFER_SIZE];
+    // bzero(name, BUFFER_SIZE);
+    // printf("reading name..");
+    int n = 1;
+    // printf("got it!");
+
+    // if (n == 0) {
+    //     printf("End of connection\n");
+    //     return 0;
+    // }
+    
+    printf("new connection!\n");
+    fflush(stdout);
+    char buffer[BUFFER_SIZE];
+
+    while(1) {
+
+        message *msg = (message *) calloc(1, sizeof(message));
+        n = read_bytes(socket, buffer);
+
+        if (n == 0) {
+            printf("End of connection\n");
+            write(socket, "lol", 3);
+            break;
+        }
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+
+        deserialize_msg(msg, buffer, n);
+        // struct tm *timeinfo = localtime(&msg->tm);
+
+        // printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg->name, msg->text);
+        // fflush(stdout);
+        
+        // dprintf(pipe_fd[0], "%p\n", msg);
+        write(pipe_fd[1], &msg, sizeof(message *));
+        // printf("send\n");
+
+        // n = send_msg(socket, msg);
+
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+    }
+    shutdown(socket, 2);
+    return (void *)0;
+}
+
 int main(int argc, char *argv[]) {
+
+    if (pipe(pipe_fd) < 0) {
+        perror("pipe error");
+        exit(1);
+    }
+
     int sockfd, newsockfd;
     uint16_t portno;
     unsigned int clilen;
-    char buffer[256];
     struct sockaddr_in serv_addr, cli_addr;
-    ssize_t n;
 
     if (argc < 2) {
         fprintf(stderr, "usage %s port\n", argv[0]);
@@ -47,56 +183,35 @@ int main(int argc, char *argv[]) {
     listen(sockfd, 5);
     
     clilen = sizeof(cli_addr);
-
-    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-    if (newsockfd < 0) {
-        perror("ERROR on accept");
-        exit(1);
-    }
-
-    char name[256];
-    bzero(name, 256);
-    n = read_msg(newsockfd, name); // recv on Windows
-
-    if (n == 0) {
-        printf("End of connection\n");
-        return 0;
-    }
     
-    printf("%s connected!\n", name);
     
+    ConnectionsSet connections;
+    init_set(&connections);
+
+    pthread_t sending_tid;
+    pthread_attr_t sending_attr;
+
+    pthread_attr_init(&sending_attr);
+
+    pthread_create(&sending_tid, &sending_attr, sending, &connections);
+
     while(1) {
-
-
-        bzero(buffer, 256);
-        n = read_msg(newsockfd, buffer); // recv on Windows
-
-        if (n == 0) {
-            printf("End of connection\n");
-            break;
-        }
-
-        if (n < 0) {
-            perror("ERROR reading from socket");
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        if (newsockfd < 0) {
+            perror("ERROR on accept");
             exit(1);
         }
+        
+        add(&connections, newsockfd);
+        pthread_t reader_tid;
+        pthread_attr_t reader_attr;
 
-        time_t rawtime;
-        struct tm * timeinfo;
+        pthread_attr_init(&reader_attr);
 
-        time ( &rawtime );
-        timeinfo = localtime ( &rawtime );
-        time ( &rawtime );
-        timeinfo = localtime ( &rawtime );
-
-        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, name, buffer);
-
-        n = send_msg(newsockfd, "I got your message"); // send on Windows
-
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
-        }
+        pthread_create(&reader_tid, &reader_attr, connection_handler, (void *)newsockfd);
     }
+    // pthread_join(reader_tid, NULL);
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
     return 0;
 }
