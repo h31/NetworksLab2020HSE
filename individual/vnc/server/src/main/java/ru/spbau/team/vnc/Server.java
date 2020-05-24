@@ -8,7 +8,7 @@ import java.util.List;
 public class Server {
 
     public final static int MAJOR_VERSION = 3;
-    public final static int MINOR_VERSION = 3;
+    public final static int MINOR_VERSION = 8;
 
     private final ServerSocket socket;
     private final List<Connection> connections = new ArrayList<>();

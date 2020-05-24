@@ -26,6 +26,7 @@ public class VersionSelectMessage {
 
     public static VersionSelectMessage fromInputStream(InputStream inputStream) throws IOException {
         var buffer = inputStream.readNBytes(expectedBytes);
+        // TODO: check read number of bytes
         var versionSelectString = new String(buffer, StandardCharsets.US_ASCII);
         System.out.println("Received version select message:\n" + versionSelectString);
         var majorVersion = Integer.parseInt(versionSelectString.substring(4, 7));
