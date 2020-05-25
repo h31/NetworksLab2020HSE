@@ -15,14 +15,14 @@ public class SecurityResultMessage implements OutcomingMessage {
 
     @Override
     public byte[] toByteArray() throws IOException {
-        try (var outputStream = new ByteArrayOutputStream()) {
+        try (var outputStream = new FormattedByteArrayWriter(new ByteArrayOutputStream())) {
             int result;
             if (isSuccess) {
                 result = 0;
             } else {
                 result = 1;
             }
-            outputStream.writeBytes(Utils.toBigEndian32(result));
+            outputStream.writeS32BigEndian(result);
             return outputStream.toByteArray();
         }
     }

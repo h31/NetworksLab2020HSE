@@ -1,5 +1,6 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
+import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.messages.Utils;
 
 import java.io.IOException;
@@ -24,6 +25,11 @@ public class SetEncodingsMessage extends RoutineMessage {
         }
 
         return new SetEncodingsMessage(encodings);
+    }
+
+    @Override
+    public void execute(Connection connection) {
+        // TODO
     }
 
     public int[] getEncodings() {

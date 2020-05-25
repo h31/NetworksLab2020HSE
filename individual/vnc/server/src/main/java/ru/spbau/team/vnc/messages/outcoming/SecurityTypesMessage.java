@@ -16,10 +16,10 @@ public class SecurityTypesMessage implements OutcomingMessage {
 
     @Override
     public byte[] toByteArray() throws IOException {
-        try (var outputStream = new ByteArrayOutputStream()) {
-            outputStream.write(securityTypes.size());
+        try (var outputStream = new FormattedByteArrayWriter(new ByteArrayOutputStream())) {
+            outputStream.writeByte(securityTypes.size());
             for (SecurityType securityType : securityTypes) {
-                outputStream.write(securityType.getCode());
+                outputStream.writeByte(securityType.getCode());
             }
             return outputStream.toByteArray();
         }

@@ -1,6 +1,7 @@
 package ru.spbau.team.vnc;
 
 import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.outcoming.FormattedByteArrayWriter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,9 +35,9 @@ public class PixelFormat {
     }
 
     public static PixelFormat getDefault() {
-        return new PixelFormat(32, 24, true, false,
+        return new PixelFormat(32, 24, true, true,
             (1 << 8) - 1, (1 << 8) - 1, (1 << 8) - 1,
-            0, 8, 16);
+            16, 8, 0);
     }
 
     public int getBitsPerPixel() {
@@ -80,17 +81,17 @@ public class PixelFormat {
     }
 
     public byte[] toByteArray() throws IOException {
-        try (var outputStream = new ByteArrayOutputStream()) {
-            outputStream.write(bitsPerPixel);
-            outputStream.write(depth);
-            outputStream.write(Utils.toByte(bigEndian));
-            outputStream.write(Utils.toByte(trueColor));
-            outputStream.writeBytes(Utils.toBigEndian16(redMax));
-            outputStream.writeBytes(Utils.toBigEndian16(greenMax));
-            outputStream.writeBytes(Utils.toBigEndian16(blueMax));
-            outputStream.write(redShift);
-            outputStream.write(greenShift);
-            outputStream.write(blueShift);
+        try (var outputStream = new FormattedByteArrayWriter(new ByteArrayOutputStream())) {
+            outputStream.writeByte(bitsPerPixel);
+            outputStream.writeByte(depth);
+            outputStream.writeBoolean(bigEndian);
+            outputStream.writeBoolean(trueColor);
+            outputStream.writeU16BigEndian(redMax);
+            outputStream.writeU16BigEndian(greenMax);
+            outputStream.writeU16BigEndian(blueMax);
+            outputStream.writeByte(redShift);
+            outputStream.writeByte(greenShift);
+            outputStream.writeByte(blueShift);
             // padding
             outputStream.writeBytes(new byte[] { 0, 0, 0 });
 

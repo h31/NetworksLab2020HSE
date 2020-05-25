@@ -5,10 +5,15 @@ import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
 import ru.spbau.team.vnc.messages.incoming.routine.RoutineMessage;
 import ru.spbau.team.vnc.messages.outcoming.*;
+import ru.spbau.team.vnc.messages.outcoming.update.FramebufferUpdateRectangle;
+import ru.spbau.team.vnc.messages.outcoming.update.encodings.RawEncodedRectangle;
 import ru.spbau.team.vnc.security.SecurityType;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -28,10 +33,26 @@ public class Connection {
         try {
             initConnection();
             routine();
-        } catch (IOException e) {
+        } catch (IOException | AWTException e) {
             e.printStackTrace();
             disconnect();
         }
+    }
+
+    public void sendRawUpdate() throws AWTException, IOException {
+        BufferedImage capture = new Robot().createScreenCapture(
+            new Rectangle(0, 0, parameters.getFramebufferWidth(), parameters.getGetFramebufferHeight()));
+        var updateRectangles = new ArrayList<FramebufferUpdateRectangle>();
+        for (int row = 0; row < parameters.getGetFramebufferHeight(); ++row) {
+            var rowRGB = new int[parameters.getFramebufferWidth()];
+            for (int column = 0; column < parameters.getFramebufferWidth(); ++column) {
+                rowRGB[column] = Integer.reverseBytes(capture.getRGB(column, row));
+            }
+            var encodedRectangle = new RawEncodedRectangle(rowRGB, parameters.getPixelFormat());
+            var updateRectangle = new FramebufferUpdateRectangle(0, row, parameters.getFramebufferWidth(), 1, encodedRectangle);
+            updateRectangles.add(updateRectangle);
+        }
+        sendMessage(new FramebufferUpdateMessage(updateRectangles));
     }
 
     private void initConnection() throws IOException {
@@ -40,10 +61,12 @@ public class Connection {
         initialization();
     }
 
-    private void routine() throws IOException {
+    private void routine() throws IOException, AWTException {
         while (true) {
             var routineMessage = RoutineMessage.fromInputStream(socket.getInputStream());
-            // TODO
+            if (routineMessage != null) {
+                routineMessage.execute(this);
+            }
         }
     }
 

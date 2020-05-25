@@ -1,7 +1,9 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
+import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.messages.Utils;
 
+import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -31,6 +33,12 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         int height = Utils.readU16BigEndian(inputStream);
 
         return new FrameBufferUpdateRequestMessage(incremental, xPosition, yPosition, width, height);
+    }
+
+    @Override
+    public void execute(Connection connection) throws AWTException, IOException {
+        // TODO: Normal send
+        connection.sendRawUpdate();
     }
 
     public boolean isIncremental() {

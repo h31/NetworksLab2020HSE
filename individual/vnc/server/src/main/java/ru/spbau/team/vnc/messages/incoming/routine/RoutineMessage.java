@@ -1,8 +1,9 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
+import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.messages.Utils;
-import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 
+import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -33,4 +34,6 @@ public abstract class RoutineMessage {
         }
         return null;
     }
+
+    abstract public void execute(Connection connection) throws AWTException, IOException;
 }
