@@ -1,6 +1,5 @@
 package ru.spbau.team.vnc;
 
-import ru.spbau.team.vnc.messages.Utils;
 import ru.spbau.team.vnc.messages.outcoming.FormattedByteArrayWriter;
 
 import java.io.ByteArrayOutputStream;

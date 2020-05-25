@@ -5,7 +5,13 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-public class Utils {
+public class FormattedReader extends InputStream {
+
+    private final InputStream inputStream;
+
+    public FormattedReader(InputStream inputStream) {
+        this.inputStream = inputStream;
+    }
 
     private static int fromBigEndian32(byte[] bigEndian) {
         return ByteBuffer
@@ -36,33 +42,38 @@ public class Utils {
             .getLong();
     }
 
-    public static long readU32BigEndian(InputStream inputStream) throws IOException {
+    public long readU32BigEndian() throws IOException {
         byte[] buffer = inputStream.readNBytes(4);
         // TODO: Check read 4 bytes
         return fromBigEndianU32(buffer);
     }
 
-    public static int readS32BigEndian(InputStream inputStream) throws IOException {
+    public int readS32BigEndian() throws IOException {
         byte[] buffer = inputStream.readNBytes(4);
         // TODO: Check read 4 bytes
         return fromBigEndian32(buffer);
     }
 
-    public static int readU16BigEndian(InputStream inputStream) throws IOException {
+    public int readU16BigEndian() throws IOException {
         byte[] buffer = inputStream.readNBytes(2);
         // TODO: Check read 2 bytes
         return fromBigEndian16(buffer);
     }
 
-    public static int readU8(InputStream inputStream) throws IOException {
+    public int readU8() throws IOException {
         byte[] buffer = inputStream.readNBytes(1);
         // TODO: Check read 1 byte
         // TODO: normal cast to int. NB! just cast doesn't work because of sign
         return fromBigEndian16(new byte[] { 0, buffer[0] });
     }
 
-    public static boolean readBoolean(InputStream inputStream) throws IOException {
-        int result = readU8(inputStream);
+    public boolean readBoolean() throws IOException {
+        int result = readU8();
         return result != 0;
+    }
+
+    @Override
+    public int read() throws IOException {
+        return inputStream.read();
     }
 }

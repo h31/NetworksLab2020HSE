@@ -1,5 +1,6 @@
 package ru.spbau.team.vnc;
 
+import ru.spbau.team.vnc.messages.FormattedReader;
 import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
@@ -22,6 +23,7 @@ public class Connection {
     private final Socket socket;
     private final Server server;
     private final Parameters parameters;
+    private FormattedReader inputStream;
 
     public Connection(Socket socket, Server server, Parameters parameters) {
         this.socket = socket;
@@ -31,6 +33,7 @@ public class Connection {
 
     public void run() {
         try {
+            inputStream = new FormattedReader(socket.getInputStream());
             initConnection();
             routine();
         } catch (IOException | AWTException e) {
@@ -63,7 +66,7 @@ public class Connection {
 
     private void routine() throws IOException, AWTException {
         while (true) {
-            var routineMessage = RoutineMessage.fromInputStream(socket.getInputStream());
+            var routineMessage = RoutineMessage.fromInputStream(inputStream);
             if (routineMessage != null) {
                 routineMessage.execute(this);
             }
@@ -83,7 +86,7 @@ public class Connection {
             // TODO throw
         } else {
             sendMessage(new SecurityTypesMessage(Arrays.asList(SecurityType.INVALID, SecurityType.NONE)));
-            var security = SecuritySelectMessage.fromInputStream(socket.getInputStream());
+            var security = SecuritySelectMessage.fromInputStream(inputStream);
             // TODO: use security
             if (security.getSecurityType().equals(SecurityType.INVALID)) {
                 sendMessage(new SecurityResultMessage(false));
@@ -95,7 +98,7 @@ public class Connection {
     }
 
     private void initialization() throws IOException {
-        var isShared = ClientInitMessage.fromInputStream(socket.getInputStream()).isShared();
+        var isShared = ClientInitMessage.fromInputStream(inputStream).isShared();
         if (isShared) {
             // TODO: disconnect others
         }

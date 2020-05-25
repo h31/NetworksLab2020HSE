@@ -1,10 +1,9 @@
 package ru.spbau.team.vnc.messages.incoming;
 
-import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.FormattedReader;
 import ru.spbau.team.vnc.security.SecurityType;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 public class SecuritySelectMessage {
 
@@ -25,8 +24,8 @@ public class SecuritySelectMessage {
         return securityType;
     }
 
-    public static SecuritySelectMessage fromInputStream(InputStream inputStream) throws IOException {
-        int code = Utils.readU8(inputStream);
+    public static SecuritySelectMessage fromInputStream(FormattedReader inputStream) throws IOException {
+        int code = inputStream.readU8();
         return new SecuritySelectMessage(code);
     }
 }

@@ -1,11 +1,10 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.FormattedReader;
 
 import java.awt.*;
 import java.io.IOException;
-import java.io.InputStream;
 
 public class FrameBufferUpdateRequestMessage extends RoutineMessage {
 
@@ -25,12 +24,12 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
     }
 
-    public static FrameBufferUpdateRequestMessage fromInputStream(InputStream inputStream) throws IOException {
-        boolean incremental = Utils.readBoolean(inputStream);
-        int xPosition = Utils.readU16BigEndian(inputStream);
-        int yPosition = Utils.readU16BigEndian(inputStream);
-        int width = Utils.readU16BigEndian(inputStream);
-        int height = Utils.readU16BigEndian(inputStream);
+    public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream) throws IOException {
+        boolean incremental = inputStream.readBoolean();
+        int xPosition = inputStream.readU16BigEndian();
+        int yPosition = inputStream.readU16BigEndian();
+        int width = inputStream.readU16BigEndian();
+        int height = inputStream.readU16BigEndian();
 
         return new FrameBufferUpdateRequestMessage(incremental, xPosition, yPosition, width, height);
     }

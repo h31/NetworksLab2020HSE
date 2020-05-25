@@ -1,17 +1,16 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.FormattedReader;
 
 import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 
 public abstract class RoutineMessage {
-    private static final int headerSize = 1;
 
-    public static RoutineMessage fromInputStream(InputStream inputStream) throws IOException {
-        int messageType = Utils.readU8(inputStream);
+    public static RoutineMessage fromInputStream(FormattedReader inputStream) throws IOException {
+        int messageType = inputStream.readU8();
 
         System.out.println("Got message with code " + messageType);
         if (messageType == 0) {

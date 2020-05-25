@@ -1,10 +1,9 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.FormattedReader;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 public class SetEncodingsMessage extends RoutineMessage {
 
@@ -14,13 +13,13 @@ public class SetEncodingsMessage extends RoutineMessage {
         this.encodings = encodings;
     }
 
-    public static SetEncodingsMessage fromInputStream(InputStream inputStream) throws IOException {
-        int padding = Utils.readU8(inputStream);
-        int numberOfEncodings = Utils.readU16BigEndian(inputStream);
+    public static SetEncodingsMessage fromInputStream(FormattedReader inputStream) throws IOException {
+        int padding = inputStream.readU8();
+        int numberOfEncodings = inputStream.readU16BigEndian();
         System.out.println("Have to set " + numberOfEncodings);
         var encodings = new int[numberOfEncodings];
         for (int encodingIndex = 0; encodingIndex < numberOfEncodings; ++encodingIndex) {
-            encodings[encodingIndex] = Utils.readS32BigEndian(inputStream);
+            encodings[encodingIndex] = inputStream.readS32BigEndian();
             System.out.println("Set encoding " + encodings[encodingIndex]);
         }
 

@@ -1,9 +1,8 @@
 package ru.spbau.team.vnc.messages.incoming;
 
-import ru.spbau.team.vnc.messages.Utils;
+import ru.spbau.team.vnc.messages.FormattedReader;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 public class ClientInitMessage {
     private final boolean shared;
@@ -16,8 +15,8 @@ public class ClientInitMessage {
         return shared;
     }
 
-    public static ClientInitMessage fromInputStream(InputStream inputStream) throws IOException {
-        boolean shared = Utils.readBoolean(inputStream);
+    public static ClientInitMessage fromInputStream(FormattedReader inputStream) throws IOException {
+        boolean shared = inputStream.readBoolean();
         return new ClientInitMessage(shared);
     }
 }
