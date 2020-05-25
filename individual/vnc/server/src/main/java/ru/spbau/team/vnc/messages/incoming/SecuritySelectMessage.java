@@ -1,6 +1,6 @@
 package ru.spbau.team.vnc.messages.incoming;
 
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
 import ru.spbau.team.vnc.security.SecurityType;
 
 import java.io.IOException;
@@ -24,7 +24,7 @@ public class SecuritySelectMessage {
         return securityType;
     }
 
-    public static SecuritySelectMessage fromInputStream(FormattedReader inputStream) throws IOException {
+    public static SecuritySelectMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
         int code = inputStream.readU8();
         return new SecuritySelectMessage(code);
     }

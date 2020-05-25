@@ -1,6 +1,7 @@
 package ru.spbau.team.vnc;
 
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
+import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
@@ -36,7 +37,7 @@ public class Connection {
             inputStream = new FormattedReader(socket.getInputStream());
             initConnection();
             routine();
-        } catch (IOException | AWTException e) {
+        } catch (IOException | AWTException | ClientDisconnectedException e) {
             e.printStackTrace();
             disconnect();
         }
@@ -58,13 +59,13 @@ public class Connection {
         sendMessage(new FramebufferUpdateMessage(updateRectangles));
     }
 
-    private void initConnection() throws IOException {
+    private void initConnection() throws IOException, ClientDisconnectedException {
         var selectedVersion = protocolVersionHandshake();
         securityHandshake(selectedVersion);
         initialization();
     }
 
-    private void routine() throws IOException, AWTException {
+    private void routine() throws IOException, AWTException, ClientDisconnectedException {
         while (true) {
             var routineMessage = RoutineMessage.fromInputStream(inputStream);
             if (routineMessage != null) {
@@ -78,7 +79,7 @@ public class Connection {
         return VersionSelectMessage.fromInputStream(socket.getInputStream());
     }
 
-    private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException {
+    private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException, ClientDisconnectedException {
         if (versionIsNotSupported(selectedVersion)) {
             sendMessage(new SecurityTypesMessage(Collections.emptyList()));
             String errorMessage = "Version " + selectedVersion.getMajorVersion() + "." + selectedVersion.getMinorVersion() + " is not supported";
@@ -97,7 +98,7 @@ public class Connection {
         }
     }
 
-    private void initialization() throws IOException {
+    private void initialization() throws IOException, ClientDisconnectedException {
         var isShared = ClientInitMessage.fromInputStream(inputStream).isShared();
         if (isShared) {
             // TODO: disconnect others

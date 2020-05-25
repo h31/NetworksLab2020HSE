@@ -1,6 +1,6 @@
 package ru.spbau.team.vnc.messages.incoming;
 
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
 
 import java.io.IOException;
 
@@ -15,7 +15,7 @@ public class ClientInitMessage {
         return shared;
     }
 
-    public static ClientInitMessage fromInputStream(FormattedReader inputStream) throws IOException {
+    public static ClientInitMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
         boolean shared = inputStream.readBoolean();
         return new ClientInitMessage(shared);
     }

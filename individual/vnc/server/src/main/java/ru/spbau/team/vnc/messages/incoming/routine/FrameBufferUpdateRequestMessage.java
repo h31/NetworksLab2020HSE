@@ -1,7 +1,8 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
+import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 
 import java.awt.*;
 import java.io.IOException;
@@ -24,7 +25,7 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
     }
 
-    public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream) throws IOException {
+    public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
         boolean incremental = inputStream.readBoolean();
         int xPosition = inputStream.readU16BigEndian();
         int yPosition = inputStream.readU16BigEndian();

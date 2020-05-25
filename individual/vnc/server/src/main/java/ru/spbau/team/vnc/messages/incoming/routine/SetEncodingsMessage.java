@@ -1,7 +1,8 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
+import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 
 import java.io.IOException;
 
@@ -13,7 +14,7 @@ public class SetEncodingsMessage extends RoutineMessage {
         this.encodings = encodings;
     }
 
-    public static SetEncodingsMessage fromInputStream(FormattedReader inputStream) throws IOException {
+    public static SetEncodingsMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
         int padding = inputStream.readU8();
         int numberOfEncodings = inputStream.readU16BigEndian();
         System.out.println("Have to set " + numberOfEncodings);

@@ -1,15 +1,15 @@
 package ru.spbau.team.vnc.messages.incoming.routine;
 
 import ru.spbau.team.vnc.Connection;
-import ru.spbau.team.vnc.messages.FormattedReader;
+import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
+import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 
 import java.awt.*;
 import java.io.IOException;
-import java.io.InputStream;
 
 public abstract class RoutineMessage {
 
-    public static RoutineMessage fromInputStream(FormattedReader inputStream) throws IOException {
+    public static RoutineMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
         int messageType = inputStream.readU8();
 
         System.out.println("Got message with code " + messageType);
