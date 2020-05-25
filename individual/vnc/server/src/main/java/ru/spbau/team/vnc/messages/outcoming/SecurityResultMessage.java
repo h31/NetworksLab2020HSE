@@ -22,7 +22,7 @@ public class SecurityResultMessage implements OutcomingMessage {
             } else {
                 result = 1;
             }
-            outputStream.writeBytes(Utils.toBigEndian(result));
+            outputStream.writeBytes(Utils.toBigEndian32(result));
             return outputStream.toByteArray();
         }
     }

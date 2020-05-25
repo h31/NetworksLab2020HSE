@@ -1,5 +1,6 @@
 package ru.spbau.team.vnc;
 
+import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
 import ru.spbau.team.vnc.messages.outcoming.*;
@@ -7,7 +8,6 @@ import ru.spbau.team.vnc.security.SecurityType;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -15,10 +15,12 @@ public class Connection {
 
     private final Socket socket;
     private final Server server;
+    private final Parameters parameters;
 
-    public Connection(Socket socket, Server server) {
+    public Connection(Socket socket, Server server, Parameters parameters) {
         this.socket = socket;
         this.server = server;
+        this.parameters = parameters;
     }
 
     public void run() {
@@ -33,7 +35,7 @@ public class Connection {
     private void initConnection() throws IOException {
         var selectedVersion = protocolVersionHandshake();
         securityHandshake(selectedVersion);
-
+        initialization();
     }
 
     private VersionSelectMessage protocolVersionHandshake() throws IOException {
@@ -58,6 +60,14 @@ public class Connection {
                 sendMessage(new SecurityResultMessage(true));
             }
         }
+    }
+
+    private void initialization() throws IOException {
+        var isShared = ClientInitMessage.fromInputStream(socket.getInputStream()).isShared();
+        if (isShared) {
+            // TODO: disconnect others
+        }
+        sendMessage(new ServerInitMessage(parameters));
     }
 
     private boolean versionIsNotSupported(VersionSelectMessage selectedVersion) {

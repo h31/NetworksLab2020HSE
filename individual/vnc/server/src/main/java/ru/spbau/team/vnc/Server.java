@@ -11,16 +11,24 @@ public class Server {
     public final static int MINOR_VERSION = 8;
 
     private final ServerSocket socket;
+    /** True if there is client with false as shared flag */
+    private volatile boolean hasPrivateClient = false;
     private final List<Connection> connections = new ArrayList<>();
+    private final Parameters defaultParameters;
 
-    public Server(int port) throws IOException {
+    public Server(int port, String name) throws IOException {
         socket = new ServerSocket(port);
+        defaultParameters = Parameters.getDefaultWithName(name);
     }
 
     public void start() {
         while (true) {
             try {
-                var newConnection = new Connection(socket.accept(), this);
+                var newConnection = new Connection(socket.accept(), this, defaultParameters.clone());
+                if (hasPrivateClient) {
+                    newConnection.disconnect();
+                    continue;
+                }
                 // Synchronized because in future we will delete from connections list from other thread
                 synchronized (connections) {
                     connections.add(newConnection);
@@ -36,7 +44,7 @@ public class Server {
     public static void main(String[] args) {
         Server server;
         try {
-            server = new Server(5900);
+            server = new Server(5900, "TODO: name");
         } catch (IOException e) {
             e.printStackTrace();
             return;

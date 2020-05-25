@@ -15,7 +15,7 @@ public class SecurityFailureMessage implements OutcomingMessage {
     @Override
     public byte[] toByteArray() throws IOException {
         try (var outputStream = new ByteArrayOutputStream()) {
-            byte[] bigEndianLength = Utils.toBigEndian(reason.length());
+            byte[] bigEndianLength = Utils.toBigEndian32(reason.length());
             outputStream.writeBytes(bigEndianLength);
             outputStream.writeBytes(reason.getBytes(StandardCharsets.US_ASCII));
             return outputStream.toByteArray();
