@@ -15,14 +15,17 @@ public abstract class RoutineMessage {
         System.out.println("Got message with code " + messageType);
         if (messageType == 0) {
             // TODO SetPixelFormat
+            inputStream.readNBytes(19);
         } else if (messageType == 2) {
-            // TODO SetEncodings
+            return SetEncodingsMessage.fromInputStream(inputStream);
         } else if (messageType == 3) {
             return FrameBufferUpdateRequestMessage.fromInputStream(inputStream);
         } else if (messageType == 4) {
             // TODO KeyEvent
+            inputStream.readNBytes(7);
         } else if (messageType == 5) {
             // TODO PointerEvent
+            inputStream.readNBytes(5);
         } else if (messageType == 6) {
             // TODO ClientCutText
         } else {

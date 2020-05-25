@@ -51,6 +51,28 @@ public class Utils {
             .getInt();
     }
 
+    private static long fromBigEndianU32(byte[] bigEndian) {
+        return ByteBuffer
+            .allocate(8)
+            .put(new byte[] { 0, 0, 0, 0 })
+            .put(bigEndian)
+            .order(ByteOrder.BIG_ENDIAN)
+            .flip()
+            .getLong();
+    }
+
+    public static long readU32BigEndian(InputStream inputStream) throws IOException {
+        byte[] buffer = inputStream.readNBytes(4);
+        // TODO: Check read 4 bytes
+        return fromBigEndianU32(buffer);
+    }
+
+    public static int readS32BigEndian(InputStream inputStream) throws IOException {
+        byte[] buffer = inputStream.readNBytes(4);
+        // TODO: Check read 4 bytes
+        return fromBigEndian32(buffer);
+    }
+
     public static int readU16BigEndian(InputStream inputStream) throws IOException {
         byte[] buffer = inputStream.readNBytes(2);
         // TODO: Check read 2 bytes
