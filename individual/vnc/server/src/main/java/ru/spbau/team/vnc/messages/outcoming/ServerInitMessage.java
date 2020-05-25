@@ -1,6 +1,7 @@
 package ru.spbau.team.vnc.messages.outcoming;
 
 import ru.spbau.team.vnc.Parameters;
+import ru.spbau.team.vnc.messages.Utils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

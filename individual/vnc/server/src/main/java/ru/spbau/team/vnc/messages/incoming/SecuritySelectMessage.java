@@ -1,5 +1,6 @@
 package ru.spbau.team.vnc.messages.incoming;
 
+import ru.spbau.team.vnc.messages.Utils;
 import ru.spbau.team.vnc.security.SecurityType;
 
 import java.io.IOException;
@@ -8,8 +9,6 @@ import java.io.InputStream;
 public class SecuritySelectMessage {
 
     private SecurityType securityType;
-
-    private static final int expectedBytes = 1;
 
     private SecuritySelectMessage(int code) {
         securityType = SecurityType.INVALID;
@@ -27,9 +26,8 @@ public class SecuritySelectMessage {
     }
 
     public static SecuritySelectMessage fromInputStream(InputStream inputStream) throws IOException {
-        var buffer = inputStream.readNBytes(expectedBytes);
-        // TODO check number of bytes read
-        return new SecuritySelectMessage(buffer[0]);
+        int code = Utils.readU8(inputStream);
+        return new SecuritySelectMessage(code);
     }
 }
 

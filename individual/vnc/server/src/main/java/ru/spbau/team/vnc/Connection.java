@@ -3,6 +3,7 @@ package ru.spbau.team.vnc;
 import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
+import ru.spbau.team.vnc.messages.incoming.routine.RoutineMessage;
 import ru.spbau.team.vnc.messages.outcoming.*;
 import ru.spbau.team.vnc.security.SecurityType;
 
@@ -26,6 +27,7 @@ public class Connection {
     public void run() {
         try {
             initConnection();
+            routine();
         } catch (IOException e) {
             e.printStackTrace();
             disconnect();
@@ -36,6 +38,13 @@ public class Connection {
         var selectedVersion = protocolVersionHandshake();
         securityHandshake(selectedVersion);
         initialization();
+    }
+
+    private void routine() throws IOException {
+        while (true) {
+            var routineMessage = RoutineMessage.fromInputStream(socket.getInputStream());
+            // TODO
+        }
     }
 
     private VersionSelectMessage protocolVersionHandshake() throws IOException {
