@@ -20,7 +20,7 @@ import java.nio.file.Path
 
 //TODO: move field names to constants
 class Searcher : AutoCloseable {
-    private val index: Directory = MMapDirectory(Path.of("./lucene"))
+    private val index: Directory = MMapDirectory(Path.of(LUCENE_PATH))
     private val analyzer = StandardAnalyzer()
     private val indexWriterConfig = IndexWriterConfig(analyzer)
     private val indexWriter = run {
@@ -38,14 +38,14 @@ class Searcher : AutoCloseable {
             }.map {
                 it.toLowerCase()
             }.forEach {
-                booleanQueryBuilder.add(TermQuery(Term("content", it)), BooleanClause.Occur.SHOULD)
-                booleanQueryBuilder.add(TermQuery(Term("title", it)), BooleanClause.Occur.SHOULD)
+                booleanQueryBuilder.add(TermQuery(Term(CONTENT_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
+                booleanQueryBuilder.add(TermQuery(Term(TITLE_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
             }
             val query = booleanQueryBuilder.build()
             val topDocs = indexSearcher.search(query, 10)
             return topDocs.scoreDocs.map {
                 val document = indexSearcher.doc(it.doc)
-                SearchResult(URL(document.get("url")), document.get("title"))
+                SearchResult(URL(document.get(URL_FIELD_NAME)), document.get(TITLE_FIELD_NAME))
             }
         }
     }
@@ -54,9 +54,9 @@ class Searcher : AutoCloseable {
         val pageInfo = Crawler.getPageInfo(url)
         indexWriter.addDocument(
             listOf(
-                StringField("url", url.toString(), Field.Store.YES),
-                TextField("title", pageInfo.name, Field.Store.YES),
-                TextField("content", pageInfo.content, Field.Store.NO)
+                StringField(URL_FIELD_NAME, url.toString(), Field.Store.YES),
+                TextField(TITLE_FIELD_NAME, pageInfo.name, Field.Store.YES),
+                TextField(CONTENT_FIELD_NAME, pageInfo.content, Field.Store.NO)
             )
         )
         indexWriter.commit()
@@ -66,7 +66,12 @@ class Searcher : AutoCloseable {
         indexWriter.close()
     }
 
-    companion object Searcher {
+    companion object {
+        const val URL_FIELD_NAME = "url"
+        const val TITLE_FIELD_NAME = "title"
+        const val CONTENT_FIELD_NAME = "content"
+        const val LUCENE_PATH = "./lucene"
+
         data class SearchResult(val url: URL, val name: String)
     }
 }

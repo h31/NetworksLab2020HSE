@@ -8,21 +8,25 @@ import java.net.URL
 
 class RequestHandler(server: Javalin, searcher: Searcher) {
     init {
-        server.get("/") {
+        server.get(BASE_PATH) {
                 ctx -> ctx.html(FrontPage.createHtml(null))
         }
 
-        server.get("/search") { ctx ->
-            val query = ctx.queryParam("text")
-            val searchResult = query?.let { searcher.search(it) } ?: emptyList()
+        server.get(SEARCH_PATH) { ctx ->
+            val query = ctx.queryParam(SEARCH_QUERY_PARAM)
+            if (query == null) {
+                ctx.html(ResultPage.createHtml("ERROR: $SEARCH_QUERY_PARAM parameter was not found"))
+                return@get
+            }
+            val searchResult = searcher.search(query)
             ctx.html(FrontPage.createHtml(searchResult.map { FrontPage.SearchResult(it.url, it.name) }))
         }
 
-        server.post("/add") { ctx ->
+        server.post(ADD_PATH) { ctx ->
             try {
-                val urlString = ctx.formParam("url")
+                val urlString = ctx.formParam(ADD_FORM_PARAM)
                 if (urlString == null) {
-                    ctx.html(ResultPage.createHtml("ERROR: url parameter was not found"))
+                    ctx.html(ResultPage.createHtml("ERROR: $ADD_FORM_PARAM parameter was not found"))
                     return@post
                 }
                 val url = URL(urlString)
@@ -33,5 +37,14 @@ class RequestHandler(server: Javalin, searcher: Searcher) {
                 ctx.html(ResultPage.createHtml("ERROR: ${e.message ?: "INTERNAL ERROR"}"))
             }
         }
+    }
+
+    companion object {
+        const val BASE_PATH = "/"
+        const val SEARCH_PATH = "/search"
+        const val ADD_PATH = "/add"
+
+        const val SEARCH_QUERY_PARAM = "text"
+        const val ADD_FORM_PARAM = "url"
     }
 }

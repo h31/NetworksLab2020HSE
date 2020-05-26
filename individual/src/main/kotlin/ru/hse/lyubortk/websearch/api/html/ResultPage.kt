@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.api.html
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
+import ru.hse.lyubortk.websearch.api.RequestHandler.RequestHandler.BASE_PATH
 
 object ResultPage {
     fun createHtml(result: String) = createHTML().html {
@@ -12,7 +13,7 @@ object ResultPage {
         }
         body {
             h2 { +result }
-            a("/") {
+            a(BASE_PATH) {
                 +"back"
             }
         }
