@@ -60,19 +60,8 @@ void* client(void* arg) {
 
 
     while(1) {
-        int message_len = getmessagelen(info->sockfd);
-        if (message_len < 0) {
-            clients_list->remove(num);
-            return 0;
-        }
-        if (message_len == 0) {
-            continue;
-        }
-        
-        char buffer[message_len ];
-        bzero(buffer, message_len);
-
-        int n = readn(info->sockfd, buffer, message_len);
+        message_t message;
+        int n = message.read_from_socket(info->sockfd);
         if (n < 0) {
             clients_list->remove(num);
             return 0;
@@ -82,7 +71,7 @@ void* client(void* arg) {
 
         for (int i = 0; i < clients_list->size; i++) {
             if (clients_list->sockets[i] != 0) {
-                sendmessage(clients_list->sockets[i], message_len, buffer);
+                message.send_to_socket(clients_list->sockets[i]);
             }
         }
 

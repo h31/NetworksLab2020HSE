@@ -1,17 +1,25 @@
 #include "../readn.hpp"
 
+int8_t utc;
+
 void* sender(void* arg) {
     int socket = *((int*) arg); 
 
     char buffer[MAX_MSG_LEN];
     char msg[MSG_LEN];
     char name[NAME_LEN];
+    utc = 1000;
 
 
     printf("Enter your name: ");
     bzero(name, NAME_LEN);
     fgets(name, NAME_LEN - 1, stdin);
     
+    int utc_buff;
+    printf("Enter your time zone (UTC<N>): ");
+    scanf("%i", &utc_buff);
+    utc = utc_buff;
+
     for (int i = 0; name[i]; i++) {
         if (name[i] == '\n') {
             name[i] = 0;
@@ -29,8 +37,19 @@ void* sender(void* arg) {
         strcat(buffer, " : ");
         strcat(buffer, msg);
 
+        int message_len = strlen(msg);
         int len = strlen(buffer) + 1;
-        int n = sendmessage(socket, len, buffer);
+        time_t rawtime;
+        time(&rawtime);
+        struct tm* timeinfo = localtime(&rawtime);
+        uint32_t time = timeinfo->tm_hour * SIH  + timeinfo->tm_min * SIM + timeinfo->tm_sec;
+        message_t message(len, utc, time, buffer);
+        
+        if (message_len <= 1) {
+            continue;
+        }
+        
+        int n = message.send_to_socket(socket);
 
         if (n < 0) {
             perror("ERROR writing to socket");
@@ -45,19 +64,8 @@ void* getter(void* arg) {
 
 
     while (1) {
-        int message_len = getmessagelen(socket);
-        if (message_len < 0) {
-            perror("ERROR reading from socket");
-            close(socket);
-            exit(1);
-        }
-        if (message_len == 0) {
-            continue;
-        }
-
-        char buffer[message_len];
-        bzero(buffer, message_len);
-        int n = readn(socket, buffer, message_len);
+        message_t message;
+        int n = message.read_from_socket(socket);
 
         if (n < 0) {
             perror("ERROR reading from socket");
@@ -65,11 +73,14 @@ void* getter(void* arg) {
             exit(1);
         }
 
-        time_t rawtime;
-        time(&rawtime);
-        struct tm* timeinfo = localtime(&rawtime);
+        if (message.size == 0) {
+            continue;
+        }
 
-        printf("<%i:%i:%i> %s", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, buffer);
+        uint32_t len = message.len_int_string_format();
+        char buffer[len];
+        message.to_string(utc, buffer);
+        printf("%s", buffer);
     }
 }
 
