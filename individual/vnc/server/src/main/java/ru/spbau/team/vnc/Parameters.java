@@ -5,13 +5,13 @@ import java.awt.*;
 public class Parameters implements Cloneable {
 
     private final int framebufferWidth;
-    private final int getFramebufferHeight;
+    private final int framebufferHeight;
     private PixelFormat pixelFormat;
     private final String name;
 
-    public Parameters(int framebufferWidth, int getFramebufferHeight, PixelFormat pixelFormat, String name) {
+    public Parameters(int framebufferWidth, int framebufferHeight, PixelFormat pixelFormat, String name) {
         this.framebufferWidth = framebufferWidth;
-        this.getFramebufferHeight = getFramebufferHeight;
+        this.framebufferHeight = framebufferHeight;
         this.pixelFormat = pixelFormat;
         this.name = name;
     }
@@ -35,8 +35,8 @@ public class Parameters implements Cloneable {
         return framebufferWidth;
     }
 
-    public int getGetFramebufferHeight() {
-        return getFramebufferHeight;
+    public int getFramebufferHeight() {
+        return framebufferHeight;
     }
 
     public PixelFormat getPixelFormat() {

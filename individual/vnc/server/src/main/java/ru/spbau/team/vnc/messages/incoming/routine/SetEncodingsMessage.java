@@ -14,7 +14,8 @@ public class SetEncodingsMessage extends RoutineMessage {
         this.encodings = encodings;
     }
 
-    public static SetEncodingsMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
+    public static SetEncodingsMessage fromInputStream(FormattedReader inputStream)
+            throws IOException, ClientDisconnectedException {
         int padding = inputStream.readU8();
         int numberOfEncodings = inputStream.readU16BigEndian();
         System.out.println("Have to set " + numberOfEncodings);

@@ -25,7 +25,8 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
     }
 
-    public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
+    public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream)
+            throws IOException, ClientDisconnectedException {
         boolean incremental = inputStream.readBoolean();
         int xPosition = inputStream.readU16BigEndian();
         int yPosition = inputStream.readU16BigEndian();

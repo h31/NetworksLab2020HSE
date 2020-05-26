@@ -15,7 +15,8 @@ public class ClientInitMessage {
         return shared;
     }
 
-    public static ClientInitMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
+    public static ClientInitMessage fromInputStream(FormattedReader inputStream)
+            throws IOException, ClientDisconnectedException {
         boolean shared = inputStream.readBoolean();
         return new ClientInitMessage(shared);
     }

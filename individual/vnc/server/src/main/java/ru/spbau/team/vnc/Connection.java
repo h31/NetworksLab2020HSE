@@ -45,15 +45,16 @@ public class Connection {
 
     public void sendRawUpdate() throws AWTException, IOException {
         BufferedImage capture = new Robot().createScreenCapture(
-            new Rectangle(0, 0, parameters.getFramebufferWidth(), parameters.getGetFramebufferHeight()));
+            new Rectangle(0, 0, parameters.getFramebufferWidth(), parameters.getFramebufferHeight()));
         var updateRectangles = new ArrayList<FramebufferUpdateRectangle>();
-        for (int row = 0; row < parameters.getGetFramebufferHeight(); ++row) {
+        for (int row = 0; row < parameters.getFramebufferHeight(); ++row) {
             var rowRGB = new int[parameters.getFramebufferWidth()];
             for (int column = 0; column < parameters.getFramebufferWidth(); ++column) {
                 rowRGB[column] = Integer.reverseBytes(capture.getRGB(column, row));
             }
             var encodedRectangle = new RawEncodedRectangle(rowRGB, parameters.getPixelFormat());
-            var updateRectangle = new FramebufferUpdateRectangle(0, row, parameters.getFramebufferWidth(), 1, encodedRectangle);
+            var updateRectangle = new FramebufferUpdateRectangle(0, row,
+                    parameters.getFramebufferWidth(), 1, encodedRectangle);
             updateRectangles.add(updateRectangle);
         }
         sendMessage(new FramebufferUpdateMessage(updateRectangles));
@@ -82,7 +83,8 @@ public class Connection {
     private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException, ClientDisconnectedException {
         if (versionIsNotSupported(selectedVersion)) {
             sendMessage(new SecurityTypesMessage(Collections.emptyList()));
-            String errorMessage = "Version " + selectedVersion.getMajorVersion() + "." + selectedVersion.getMinorVersion() + " is not supported";
+            String errorMessage = "Version " + selectedVersion.getMajorVersion() + "." +
+                    selectedVersion.getMinorVersion() + " is not supported";
             sendMessage(new SecurityFailureMessage(errorMessage));
             // TODO throw
         } else {

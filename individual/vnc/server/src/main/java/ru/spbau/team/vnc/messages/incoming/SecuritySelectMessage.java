@@ -24,7 +24,8 @@ public class SecuritySelectMessage {
         return securityType;
     }
 
-    public static SecuritySelectMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
+    public static SecuritySelectMessage fromInputStream(FormattedReader inputStream)
+            throws IOException, ClientDisconnectedException {
         int code = inputStream.readU8();
         return new SecuritySelectMessage(code);
     }

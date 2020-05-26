@@ -9,7 +9,8 @@ import java.io.IOException;
 
 public abstract class RoutineMessage {
 
-    public static RoutineMessage fromInputStream(FormattedReader inputStream) throws IOException, ClientDisconnectedException {
+    public static RoutineMessage fromInputStream(FormattedReader inputStream)
+            throws IOException, ClientDisconnectedException {
         int messageType = inputStream.readU8();
 
         System.out.println("Got message with code " + messageType);

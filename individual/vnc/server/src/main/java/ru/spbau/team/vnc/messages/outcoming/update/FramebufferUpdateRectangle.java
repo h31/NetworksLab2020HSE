@@ -14,7 +14,8 @@ public class FramebufferUpdateRectangle {
     private final int height;
     private final EncodedRectangle rectangle;
 
-    public FramebufferUpdateRectangle(int xPosition, int yPosition, int width, int height, EncodedRectangle rectangle) {
+    public FramebufferUpdateRectangle(int xPosition, int yPosition, int width, int height,
+                                      EncodedRectangle rectangle) {
         this.xPosition = xPosition;
         this.yPosition = yPosition;
         this.width = width;
