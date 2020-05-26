@@ -18,24 +18,23 @@ typedef struct clients
     }
 
     int addClient(int socket) {
+        pthread_mutex_lock(&mutex);
         for (int i = 0; i < size; i++) {
             if (sockets[i] == 0) {
-                pthread_mutex_lock(&mutex);
                 sockets[i] = socket;
                 pthread_mutex_unlock(&mutex);
                 return i;
             }
         }
         resize();
+        pthread_mutex_unlock(&mutex);
         return addClient(socket);
     }
 
     void resize() {
-        pthread_mutex_lock(&mutex);
         size *= 2;
         sockets = (int*) realloc(sockets, sizeof(int) * size);
         memset(sockets + size/2, 0, size/2);
-        pthread_mutex_unlock(&mutex);
     }
 
     void remove(int index) {
@@ -53,28 +52,37 @@ typedef struct client_info
 } client_info_t;
 
 
+//the return value is not used anywhere and has no meaning
 void* client(void* arg) {
     client_info_t* info = (client_info_t*) arg;
     clients_t* clients_list = info->clients_list;
     int num = clients_list->addClient(info->sockfd);
 
-    char buffer[MAX_MSG_LEN];
 
     while(1) {
-        bzero(buffer, MAX_MSG_LEN);
-        int n = getmessage(info->sockfd, buffer);
+        int message_len = getmessagelen(info->sockfd);
+        if (message_len < 0) {
+            clients_list->remove(num);
+            return 0;
+        }
+        if (message_len == 0) {
+            continue;
+        }
+        
+        char buffer[message_len ];
+        bzero(buffer, message_len);
+
+        int n = readn(info->sockfd, buffer, message_len);
         if (n < 0) {
             clients_list->remove(num);
             return 0;
         }
 
-        // printf("got message: %s\n", buffer);
-
         pthread_mutex_lock(&(clients_list->mutex));
 
         for (int i = 0; i < clients_list->size; i++) {
             if (clients_list->sockets[i] != 0) {
-                sendmessage(clients_list->sockets[i], strlen(buffer) + 1, buffer);
+                sendmessage(clients_list->sockets[i], message_len, buffer);
             }
         }
 

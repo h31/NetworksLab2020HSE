@@ -29,7 +29,8 @@ void* sender(void* arg) {
         strcat(buffer, " : ");
         strcat(buffer, msg);
 
-        int n = sendmessage(socket, strlen(buffer) + 1, buffer);
+        int len = strlen(buffer) + 1;
+        int n = sendmessage(socket, len, buffer);
 
         if (n < 0) {
             perror("ERROR writing to socket");
@@ -42,11 +43,21 @@ void* sender(void* arg) {
 void* getter(void* arg) {
     int socket = *((int*) arg);
 
-    char buffer[MAX_MSG_LEN];
 
     while (1) {
-        bzero(buffer, MAX_MSG_LEN);
-        int n = getmessage(socket, buffer);
+        int message_len = getmessagelen(socket);
+        if (message_len < 0) {
+            perror("ERROR reading from socket");
+            close(socket);
+            exit(1);
+        }
+        if (message_len == 0) {
+            continue;
+        }
+
+        char buffer[message_len];
+        bzero(buffer, message_len);
+        int n = readn(socket, buffer, message_len);
 
         if (n < 0) {
             perror("ERROR reading from socket");

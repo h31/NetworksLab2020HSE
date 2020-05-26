@@ -1,17 +1,29 @@
 #include "readn.hpp"
 
 int readn(int socket, char* buffer, int n) {
-	int m = 0;
-	while(m < n) {
+    int m = 0;
+    while(m < n) {
         int cnt = read(socket, buffer + m, n);
-		if (cnt <= 0) {
-			return -1;
-		}
-		m += cnt;
-	}
-	return m;
+        if (cnt < 0) {
+            return -1;
+        } 
+        if (cnt == 0) {
+            break;
+        }
+        m += cnt;
+    }
+    return m;
 }
 
+
+int getmessagelen(int socket) {
+    int len = 0;
+    int n = readn(socket, (char*) &len, MSG_LEN_LEN);
+    if (n < 0) {
+        return n;
+    }
+    return len;
+}
 
 int getmessage(int socket, char* buffer) {
     bzero(buffer, MAX_MSG_LEN);
