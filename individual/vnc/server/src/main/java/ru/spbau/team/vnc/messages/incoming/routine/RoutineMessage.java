@@ -13,7 +13,7 @@ public abstract class RoutineMessage {
             throws IOException, ClientDisconnectedException {
         int messageType = inputStream.readU8();
 
-        System.out.println("Got message with code " + messageType);
+        //System.out.println("Got message with code " + messageType);
         if (messageType == 0) {
             // TODO SetPixelFormat
             inputStream.readNBytes(19);
@@ -25,8 +25,7 @@ public abstract class RoutineMessage {
             // TODO KeyEvent
             inputStream.readNBytes(7);
         } else if (messageType == 5) {
-            // TODO PointerEvent
-            inputStream.readNBytes(5);
+            return PointerEventMessage.fromInputStream(inputStream);
         } else if (messageType == 6) {
             // TODO ClientCutText
         } else {

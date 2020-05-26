@@ -22,7 +22,7 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         this.width = width;
         this.height = height;
 
-        System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
+        //System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
     }
 
     public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream)
