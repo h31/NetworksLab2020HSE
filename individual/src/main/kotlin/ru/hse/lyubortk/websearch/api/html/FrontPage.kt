@@ -6,10 +6,10 @@ import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_FORM_PARAM
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_PATH
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_PATH
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_QUERY_PARAM
-import java.net.URL
+import ru.hse.lyubortk.websearch.core.Searcher.Companion.SearchResult
 
 object FrontPage {
-    fun createHtml(results: List<SearchResult>?): String {
+    fun createHtml(searchResult: SearchResult?): String {
         return createHTML().html {
             head {
                 meta {
@@ -49,26 +49,26 @@ object FrontPage {
                     }
                 }
 
-                if (results != null) {
+                if (searchResult != null) {
                     br
-                    if (results.isNotEmpty()) {
-                        h3 { +"Results:" }
-                    } else {
-                        h3 { +"Nothing was found" }
-                    }
+                    val isExact = searchResult.totalResults.isExact
+                    val numberOfPages = searchResult.totalResults.number
+                    val query = searchResult.searchQuery
+                    +"Found ${if (isExact) "" else "more than"} $numberOfPages pages for query \"$query\""
+                    br
+                    +"Showing top ${searchResult.topPages.size} results"
+                    br
 
-                    results.forEach { searchResult ->
+                    searchResult.topPages.forEach { page ->
+                        br
                         div {
-                            a(searchResult.url.toString()) {
-                                +searchResult.name
+                            a(page.url.toString()) {
+                                +page.title
                             }
                         }
-                        br
                     }
                 }
             }
         }
     }
-
-    data class SearchResult(val url: URL, val name: String)
 }

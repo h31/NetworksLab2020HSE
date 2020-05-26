@@ -8,10 +8,7 @@ import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.index.Term
-import org.apache.lucene.search.BooleanClause
-import org.apache.lucene.search.BooleanQuery
-import org.apache.lucene.search.IndexSearcher
-import org.apache.lucene.search.TermQuery
+import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.MMapDirectory
 import ru.hse.lyubortk.websearch.crawler.Crawler
@@ -29,7 +26,7 @@ class Searcher : AutoCloseable {
         writer
     }
 
-    fun search(text: String): List<SearchResult> {
+    fun search(text: String): SearchResult {
         DirectoryReader.open(index).use { indexReader ->
             val indexSearcher = IndexSearcher(indexReader)
             val booleanQueryBuilder = BooleanQuery.Builder()
@@ -41,12 +38,17 @@ class Searcher : AutoCloseable {
                 booleanQueryBuilder.add(TermQuery(Term(CONTENT_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
                 booleanQueryBuilder.add(TermQuery(Term(TITLE_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
             }
-            val query = booleanQueryBuilder.build()
-            val topDocs = indexSearcher.search(query, 10)
-            return topDocs.scoreDocs.map {
+            val luceneSearchResult = indexSearcher.search(booleanQueryBuilder.build(), MAX_RESULTS)
+
+            val totalResults = TotalResults(
+                luceneSearchResult.totalHits.value,
+                luceneSearchResult.totalHits.relation == TotalHits.Relation.EQUAL_TO
+            )
+            val topPages = luceneSearchResult.scoreDocs.map {
                 val document = indexSearcher.doc(it.doc)
-                SearchResult(URL(document.get(URL_FIELD_NAME)), document.get(TITLE_FIELD_NAME))
+                Page(URL(document.get(URL_FIELD_NAME)), document.get(TITLE_FIELD_NAME))
             }
+            return SearchResult(text, totalResults, topPages)
         }
     }
 
@@ -71,7 +73,15 @@ class Searcher : AutoCloseable {
         const val TITLE_FIELD_NAME = "title"
         const val CONTENT_FIELD_NAME = "content"
         const val LUCENE_PATH = "./lucene"
+        const val MAX_RESULTS = 10
 
-        data class SearchResult(val url: URL, val name: String)
+        data class SearchResult(
+            val searchQuery: String,
+            val totalResults: TotalResults,
+            val topPages: List<Page>
+        )
+
+        data class Page(val url: URL, val title: String)
+        data class TotalResults(val number: Long, val isExact: Boolean)
     }
 }

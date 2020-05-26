@@ -8,18 +8,22 @@ import java.net.URL
 
 class RequestHandler(server: Javalin, searcher: Searcher) {
     init {
-        server.get(BASE_PATH) {
-                ctx -> ctx.html(FrontPage.createHtml(null))
+        server.get(BASE_PATH) { ctx ->
+            ctx.html(FrontPage.createHtml(null))
         }
 
         server.get(SEARCH_PATH) { ctx ->
-            val query = ctx.queryParam(SEARCH_QUERY_PARAM)
-            if (query == null) {
-                ctx.html(ResultPage.createHtml("ERROR: $SEARCH_QUERY_PARAM parameter was not found"))
-                return@get
+            try {
+                val query = ctx.queryParam(SEARCH_QUERY_PARAM)
+                if (query == null) {
+                    ctx.html(ResultPage.createHtml("ERROR: $SEARCH_QUERY_PARAM parameter was not found"))
+                    return@get
+                }
+                val searchResult = searcher.search(query)
+                ctx.html(FrontPage.createHtml(searchResult))
+            } catch (e: Exception) {
+                ctx.html(ResultPage.createHtml("ERROR: ${e.message ?: "INTERNAL ERROR"}"))
             }
-            val searchResult = searcher.search(query)
-            ctx.html(FrontPage.createHtml(searchResult.map { FrontPage.SearchResult(it.url, it.name) }))
         }
 
         server.post(ADD_PATH) { ctx ->
