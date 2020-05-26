@@ -15,34 +15,6 @@ int readn(int socket, char* buffer, int n) {
     return m;
 }
 
-int getmessagelen(int socket) {
-    int len = 0;
-    int n = readn(socket, (char*) &len, MSG_LEN_LEN);
-    if (n < 0) {
-        return n;
-    }
-    return len;
-}
-
-int getmessage(int socket, char* buffer) {
-    bzero(buffer, MAX_MSG_LEN);
-    int len = 0;
-    int n = readn(socket, (char*) &len, MSG_LEN_LEN);
-    if (n < 0) {
-        return -1;
-    }
-    return readn(socket, buffer, len);
-}
-
-int sendmessage(int socket, int len, char* buff) {
-    char msg[MSG_LEN_LEN + len];
-    bzero(msg, MSG_LEN_LEN + len);
-    memcpy(msg, &len, MSG_LEN_LEN);
-    memcpy(msg + MSG_LEN_LEN, buff, len);
-    return write(socket, msg, MSG_LEN_LEN + len);
-}
-
-
 message_t::message() {}
 message_t::message(uint32_t size, int8_t utc, uint32_t time, char* message) : size(size), utc_delta(utc), time_s(time) {
     message_text = (char*) malloc(size * sizeof(char));

@@ -41,6 +41,3 @@ const uint32_t SIH = SIM * 60;
 const uint32_t SID = SIH * 24;
 
 int readn(int socket, char* buffer, int n);
-int getmessage(int socket, char* buffer);
-int getmessagelen(int socket);
-int sendmessage(int socket, int len, char* buff);
