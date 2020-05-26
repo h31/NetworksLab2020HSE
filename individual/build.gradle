@@ -22,6 +22,7 @@ dependencies {
     implementation "org.slf4j:slf4j-simple:1.7.30"
     implementation "org.jetbrains.kotlinx:kotlinx-html-jvm:0.7.1"
     implementation "org.apache.lucene:lucene-core:8.5.1"
+    implementation "org.jsoup:jsoup:1.13.1"
 }
 
 compileKotlin {

@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.api.html
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
+import java.net.URL
 
 object FrontPage {
     fun createHtml(results: List<SearchResult>?): String {
@@ -54,7 +55,7 @@ object FrontPage {
 
                     results.forEach { searchResult ->
                         div {
-                            a(searchResult.url) {
+                            a(searchResult.url.toString()) {
                                 +searchResult.name
                             }
                         }
@@ -65,5 +66,5 @@ object FrontPage {
         }
     }
 
-    data class SearchResult(val url: String, val name: String)
+    data class SearchResult(val url: URL, val name: String)
 }
