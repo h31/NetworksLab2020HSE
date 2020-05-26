@@ -122,6 +122,8 @@ public class Connection {
             socket.close();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            server.disconnect(this);
         }
     }
 }

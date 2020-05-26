@@ -55,4 +55,8 @@ public class Server {
             // TODO
         }
     }
+
+    public synchronized void disconnect(Connection connection) {
+        connections.remove(connection);
+    }
 }
