@@ -6,10 +6,11 @@ import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_FORM_PARAM
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_PATH
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_PATH
 import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_QUERY_PARAM
+import ru.hse.lyubortk.websearch.core.Searcher.Companion.SearcherStats
 import ru.hse.lyubortk.websearch.core.Searcher.Companion.SearchResult
 
 object FrontPage {
-    fun createHtml(searchResult: SearchResult?): String {
+    fun createHtml(searcherStats: SearcherStats, searchResult: SearchResult?): String {
         return createHTML().html {
             head {
                 meta {
@@ -32,6 +33,8 @@ object FrontPage {
                         value = "Add to index"
                     }
                 }
+                br
+                +"Indexed pages: ${searcherStats.indexedPagesNum}"
                 br
                 br
                 form {
@@ -62,7 +65,7 @@ object FrontPage {
                     searchResult.topPages.forEach { page ->
                         br
                         div {
-                            a(page.url.toString()) {
+                            a(page.uri.toString()) {
                                 +page.title
                             }
                         }

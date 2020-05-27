@@ -9,7 +9,7 @@ import java.net.URL
 class RequestHandler(server: Javalin, searcher: Searcher) {
     init {
         server.get(BASE_PATH) { ctx ->
-            ctx.html(FrontPage.createHtml(null))
+            ctx.html(FrontPage.createHtml(searcher.getStats(), null))
         }
 
         server.get(SEARCH_PATH) { ctx ->
@@ -20,7 +20,8 @@ class RequestHandler(server: Javalin, searcher: Searcher) {
                     return@get
                 }
                 val searchResult = searcher.search(query)
-                ctx.html(FrontPage.createHtml(searchResult))
+                val searcherStats = searcher.getStats()
+                ctx.html(FrontPage.createHtml(searcherStats, searchResult))
             } catch (e: Exception) {
                 ctx.html(ResultPage.createHtml("ERROR: ${e.message ?: "INTERNAL ERROR"}"))
             }
@@ -33,9 +34,8 @@ class RequestHandler(server: Javalin, searcher: Searcher) {
                     ctx.html(ResultPage.createHtml("ERROR: $ADD_FORM_PARAM parameter was not found"))
                     return@post
                 }
-                val url = URL(urlString)
-                url.toURI() // throws if url is not formatted according to RFC2396
-                searcher.addToIndex(url)
+                val uri = URL(urlString).toURI() // throws if url is not formatted according to RFC2396
+                searcher.addToIndex(uri)
                 ctx.html(ResultPage.createHtml("Page was successfully added to index"))
             } catch (e: Exception) {
                 ctx.html(ResultPage.createHtml("ERROR: ${e.message ?: "INTERNAL ERROR"}"))

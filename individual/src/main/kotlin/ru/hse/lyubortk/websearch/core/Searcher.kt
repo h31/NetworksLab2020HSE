@@ -12,7 +12,7 @@ import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.MMapDirectory
 import ru.hse.lyubortk.websearch.crawler.Crawler
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 
 //TODO: move field names to constants
@@ -46,17 +46,18 @@ class Searcher : AutoCloseable {
             )
             val topPages = luceneSearchResult.scoreDocs.map {
                 val document = indexSearcher.doc(it.doc)
-                Page(URL(document.get(URL_FIELD_NAME)), document.get(TITLE_FIELD_NAME))
+                Page(URI(document.get(URI_FIELD_NAME)), document.get(TITLE_FIELD_NAME))
             }
             return SearchResult(text, totalResults, topPages)
         }
     }
 
-    fun addToIndex(url: URL) {
+    fun addToIndex(url: URI) {
         val pageInfo = Crawler.getPageInfo(url)
-        indexWriter.addDocument(
+        indexWriter.updateDocument(
+            Term(URI_FIELD_NAME, pageInfo.uri.toString()),
             listOf(
-                StringField(URL_FIELD_NAME, url.toString(), Field.Store.YES),
+                StringField(URI_FIELD_NAME, pageInfo.uri.toString(), Field.Store.YES),
                 TextField(TITLE_FIELD_NAME, pageInfo.name, Field.Store.YES),
                 TextField(CONTENT_FIELD_NAME, pageInfo.content, Field.Store.NO)
             )
@@ -64,12 +65,18 @@ class Searcher : AutoCloseable {
         indexWriter.commit()
     }
 
+    fun getStats(): SearcherStats {
+        DirectoryReader.open(index).use{
+            return SearcherStats(it.maxDoc()) // probably faster than numdocs
+        }
+    }
+
     override fun close() {
         indexWriter.close()
     }
 
     companion object {
-        const val URL_FIELD_NAME = "url"
+        const val URI_FIELD_NAME = "uri"
         const val TITLE_FIELD_NAME = "title"
         const val CONTENT_FIELD_NAME = "content"
         const val LUCENE_PATH = "./lucene"
@@ -81,7 +88,9 @@ class Searcher : AutoCloseable {
             val topPages: List<Page>
         )
 
-        data class Page(val url: URL, val title: String)
+        data class Page(val uri: URI, val title: String)
         data class TotalResults(val number: Long, val isExact: Boolean)
+
+        data class SearcherStats(val indexedPagesNum: Int)
     }
 }
