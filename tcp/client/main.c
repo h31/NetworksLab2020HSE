@@ -19,7 +19,7 @@ void end_of_connection(int socket, int verbose) {
 }
 
 int fix_name(char *name) {
-    size_t len = strlen(name);
+    uint32_t len = strlen(name);
     if (len > 0 && name[len - 1] == '\n') {
         name[len - 1] = '\0';
         return 1;
@@ -77,8 +77,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    for(struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next)
-    {
+    for (struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next) {
         sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
         if (sockfd == -1)
         {
@@ -122,9 +121,8 @@ int main(int argc, char *argv[]) {
         code_of_connection = 0;
     } else { 
         fix_name(msg.name);
-        // code_of_connection = send_bytes(sockfd, name);
     }
-    // printf("%s\n", msg.name);
+
     while(code_of_connection > 0) {
         bzero(msg.text, TEXT_SIZE);
         char* pnt = fgets(msg.text, TEXT_SIZE, stdin);
@@ -133,13 +131,12 @@ int main(int argc, char *argv[]) {
             code_of_connection = 0;
             break;
         }
-        /* Send message to the server */
+
         time ( &msg.tm );
-        // printf("%s\n", msg.text);
         
         char buffer[BUFFER_SIZE];
         bzero(buffer, BUFFER_SIZE);
-        size_t len = serialize_msg(&msg, buffer);
+        uint32_t len = serialize_msg(&msg, buffer);
 
         code_of_connection = send_bytes(sockfd, buffer, len);
 

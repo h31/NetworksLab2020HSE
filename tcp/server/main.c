@@ -18,7 +18,7 @@ int pipe_fd[2];
 
 struct ConnectionsSet_t {
     pthread_mutex_t lock;
-    size_t size;
+    uint32_t size;
     int sockets[SET_SIZE];
 };
 typedef struct ConnectionsSet_t ConnectionsSet;
@@ -38,23 +38,18 @@ void add(ConnectionsSet *set, int new_socket) {
 
 void *sending(void* conn_set) {
     ConnectionsSet *connections = (ConnectionsSet *) conn_set;
-    printf("start sending..\n");
     while (1) {
         message *msg = NULL;
-        // char pointer_buffer[sizeof(message*)];
         int nread = 0;
         nread = read(pipe_fd[0], &msg, sizeof(message*));
-        // sscanf(pointer_buffer, "%p\n", &msg);
         if (nread == -1) {
             continue;
         }
-        // printf("EEEE");
         if (msg == NULL) {
-            // printf("aaaaaaa %i\n", nread);
             break;
         }
         char buffer[BUFFER_SIZE];
-        size_t msg_len = serialize_msg(msg, buffer);
+        uint32_t msg_len = serialize_msg(msg, buffer);
 
         pthread_mutex_lock(&connections->lock);
         int empty_i = -1;
@@ -63,22 +58,17 @@ void *sending(void* conn_set) {
         printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg->name, msg->text);
         fflush(stdout);
         
-        size_t len = connections->size;
-        // printf("%lu\n", len);
-        for (size_t i = 0; i < len; i++) {
+        uint32_t len = connections->size;
+        for (uint32_t i = 0; i < len; i++) {
             if (send_bytes(connections->sockets[i], buffer, msg_len) > 0) {
                 if (empty_i != -1) {
                     connections->sockets[empty_i++] = connections->sockets[i];
                 } 
-                // printf("OK\n");
             } else {
-                // printf("WA\n");
                 if (empty_i == -1) {
                     empty_i = i;
                 }
                 --connections->size;
-                // printf("WAAA\n");
-
             }
         }
         pthread_mutex_unlock(&connections->lock);
@@ -90,17 +80,8 @@ void *sending(void* conn_set) {
 void *connection_handler(void *sct) {
     int socket = (int) sct;
 
-    // char name[BUFFER_SIZE];
-    // bzero(name, BUFFER_SIZE);
-    // printf("reading name..");
     int n = 1;
-    // printf("got it!");
 
-    // if (n == 0) {
-    //     printf("End of connection\n");
-    //     return 0;
-    // }
-    
     printf("new connection!\n");
     fflush(stdout);
     char buffer[BUFFER_SIZE];
@@ -122,17 +103,8 @@ void *connection_handler(void *sct) {
         }
 
         deserialize_msg(msg, buffer, n);
-        // struct tm *timeinfo = localtime(&msg->tm);
-
-        // printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg->name, msg->text);
-        // fflush(stdout);
-        
-        // dprintf(pipe_fd[0], "%p\n", msg);
         write(pipe_fd[1], &msg, sizeof(message *));
-        // printf("send\n");
-
-        // n = send_msg(socket, msg);
-
+        
         if (n < 0) {
             perror("ERROR writing to socket");
             exit(1);
@@ -210,7 +182,7 @@ int main(int argc, char *argv[]) {
 
         pthread_create(&reader_tid, &reader_attr, connection_handler, (void *)newsockfd);
     }
-    // pthread_join(reader_tid, NULL);
+
     close(pipe_fd[0]);
     close(pipe_fd[1]);
     return 0;
