@@ -36,6 +36,8 @@ object FrontPage {
                 br
                 +"Indexed pages: ${searcherStats.indexedPagesNum}"
                 br
+                +"Running indexing processes: ${searcherStats.runningProcesses}"
+                br
                 br
                 form {
                     action = SEARCH_PATH

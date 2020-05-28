@@ -4,6 +4,8 @@ import io.javalin.Javalin
 import ru.hse.lyubortk.websearch.api.html.FrontPage
 import ru.hse.lyubortk.websearch.api.html.ResultPage
 import ru.hse.lyubortk.websearch.core.Searcher
+import ru.hse.lyubortk.websearch.core.Searcher.Companion.StartIndexingResult.Refused
+import ru.hse.lyubortk.websearch.core.Searcher.Companion.StartIndexingResult.Started
 import java.net.URL
 
 class RequestHandler(server: Javalin, searcher: Searcher) {
@@ -35,8 +37,13 @@ class RequestHandler(server: Javalin, searcher: Searcher) {
                     return@post
                 }
                 val uri = URL(urlString).toURI() // throws if url is not formatted according to RFC2396
-                searcher.addToIndex(uri)
-                ctx.html(ResultPage.createHtml("Page was successfully added to index"))
+                val startIndexingResult = searcher.startIndexing(uri)
+                when (startIndexingResult) {
+                    is Started -> ctx.html(ResultPage.createHtml("Page was successfully added to index"))
+                    is Refused -> ctx.html(
+                        ResultPage.createHtml("ERROR: ${startIndexingResult.reason ?: "INTERNAL ERROR"}")
+                    )
+                }
             } catch (e: Exception) {
                 ctx.html(ResultPage.createHtml("ERROR: ${e.message ?: "INTERNAL ERROR"}"))
             }

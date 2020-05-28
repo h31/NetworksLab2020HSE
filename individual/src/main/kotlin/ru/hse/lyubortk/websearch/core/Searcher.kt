@@ -12,19 +12,21 @@ import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.MMapDirectory
 import ru.hse.lyubortk.websearch.crawler.Crawler
+import ru.hse.lyubortk.websearch.crawler.Crawler.PageFetchResult.*
 import java.net.URI
 import java.nio.file.Path
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 //TODO: move field names to constants
 class Searcher : AutoCloseable {
     private val index: Directory = MMapDirectory(Path.of(LUCENE_PATH))
     private val analyzer = StandardAnalyzer()
     private val indexWriterConfig = IndexWriterConfig(analyzer)
-    private val indexWriter = run {
-        val writer = IndexWriter(index, indexWriterConfig)
-        writer.commit() // commit creation
-        writer
-    }
+    private val indexWriter = IndexWriter(index, indexWriterConfig).also { it.commit() }
+
+    private val indexingInProgress = AtomicInteger(0)
+    private val indexingThreadPool = Executors.newFixedThreadPool(INDEXING_THREADS)
 
     fun search(text: String): SearchResult {
         DirectoryReader.open(index).use { indexReader ->
@@ -52,23 +54,62 @@ class Searcher : AutoCloseable {
         }
     }
 
-    fun addToIndex(url: URI) {
-        val pageInfo = Crawler.getPageInfo(url)
-        indexWriter.updateDocument(
-            Term(URI_FIELD_NAME, pageInfo.uri.toString()),
-            listOf(
-                StringField(URI_FIELD_NAME, pageInfo.uri.toString(), Field.Store.YES),
-                TextField(TITLE_FIELD_NAME, pageInfo.name, Field.Store.YES),
-                TextField(CONTENT_FIELD_NAME, pageInfo.content, Field.Store.NO)
-            )
-        )
-        indexWriter.commit()
+    fun startIndexing(uri: URI): StartIndexingResult {
+        val newIndexingNumber = indexingInProgress.incrementAndGet()
+        if (newIndexingNumber > MAX_INDEXING_PROCESSES) {
+            indexingInProgress.decrementAndGet()
+            return StartIndexingResult.Refused(TO_MANY_INDEXING_PROCESSES_REASON)
+        }
+
+        val pageStream = Crawler.getPageStream(uri)
+        return when (val firstPageResult = pageStream.next()) {
+            is TextPage -> {
+                addToIndex(firstPageResult)
+                startIndexingProcess(pageStream)
+                StartIndexingResult.Started
+            }
+            is NotTextPage -> {
+                indexingInProgress.decrementAndGet()
+                StartIndexingResult.Refused("Not a text page")
+            }
+            is RequestError -> {
+                indexingInProgress.decrementAndGet()
+                StartIndexingResult.Refused(firstPageResult.exception.message)
+            }
+        }
     }
 
     fun getStats(): SearcherStats {
-        DirectoryReader.open(index).use{
-            return SearcherStats(it.maxDoc()) // probably faster than numdocs
+        DirectoryReader.open(index).use {
+            return SearcherStats(it.maxDoc(), indexingInProgress.get()) // probably faster than numdocs
         }
+    }
+
+    private fun startIndexingProcess(pageStream: Crawler.PageStream) {
+        indexingThreadPool.submit {
+            var visitedPages = 0
+            while (visitedPages < MAX_VISITED_PAGES_PER_INDEXING && pageStream.hasNext()) {
+                val pageResult = pageStream.next()
+                visitedPages++
+                when (pageResult) {
+                    is TextPage -> addToIndex(pageResult)
+                    else -> Unit
+                }
+            }
+            indexingInProgress.decrementAndGet()
+        }
+    }
+
+    private fun addToIndex(textPage: TextPage) {
+        indexWriter.updateDocument(
+            Term(URI_FIELD_NAME, textPage.uri.toString()),
+            listOf(
+                StringField(URI_FIELD_NAME, textPage.uri.toString(), Field.Store.YES),
+                TextField(TITLE_FIELD_NAME, textPage.name, Field.Store.YES),
+                TextField(CONTENT_FIELD_NAME, textPage.content, Field.Store.NO)
+            )
+        )
+        indexWriter.commit()
     }
 
     override fun close() {
@@ -81,6 +122,10 @@ class Searcher : AutoCloseable {
         const val CONTENT_FIELD_NAME = "content"
         const val LUCENE_PATH = "./lucene"
         const val MAX_RESULTS = 10
+        const val INDEXING_THREADS = 5
+        const val MAX_INDEXING_PROCESSES = 5
+        const val TO_MANY_INDEXING_PROCESSES_REASON = "Too many indexing processes"
+        const val MAX_VISITED_PAGES_PER_INDEXING = 5000
 
         data class SearchResult(
             val searchQuery: String,
@@ -91,6 +136,11 @@ class Searcher : AutoCloseable {
         data class Page(val uri: URI, val title: String)
         data class TotalResults(val number: Long, val isExact: Boolean)
 
-        data class SearcherStats(val indexedPagesNum: Int)
+        data class SearcherStats(val indexedPagesNum: Int, val runningProcesses: Int)
+
+        sealed class StartIndexingResult {
+            object Started : StartIndexingResult()
+            data class Refused(val reason: String?) : StartIndexingResult()
+        }
     }
 }

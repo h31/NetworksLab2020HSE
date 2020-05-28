@@ -1,23 +1,85 @@
 package ru.hse.lyubortk.websearch.crawler
 
 import org.jsoup.Jsoup
+import ru.hse.lyubortk.websearch.util.RandomTreeSet
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Duration
 
+//TODO move 10 to constants
 object Crawler {
-    private val httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
+    private val httpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .build()
 
-    fun getPageInfo(uri: URI): PageInfo {
-        val request = HttpRequest.newBuilder().uri(uri).GET().build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        val htmlString = response.body() ?: ""
-        val document = Jsoup.parse(htmlString)
-        val responseUri = response.uri()
-        val title = document.title().ifEmpty { responseUri.toString() }
-        return PageInfo(responseUri, title, document.text())
+    fun getPageStream(uri: URI): PageStream = PageStream(uri)
+
+    /**
+     * An Iterator-like class which downloads pages and adds all links to the queue.
+     * Does not implement the Iterator interface because Iterators are used with collections
+     * and no one expects an Iterator to send HTTP requests .
+     */
+    class PageStream(startURI: URI) {
+        private val visitedUris: MutableSet<URI> = mutableSetOf()
+        private val uriQueue: RandomTreeSet<URI> = RandomTreeSet<URI>().also { it.add(startURI) }
+
+        fun hasNext(): Boolean = uriQueue.isNotEmpty()
+
+        fun next(): PageFetchResult {
+            if (uriQueue.isEmpty()) {
+                throw NoSuchElementException()
+            }
+            val uri = uriQueue.getRandom()
+            uriQueue.remove(uri)
+
+            try {
+                val request = HttpRequest.newBuilder().uri(uri).GET().timeout(Duration.ofSeconds(10)).build()
+                val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+                val responseUri = response.uri()
+                visitedUris.add(uri)
+                visitedUris.add(responseUri)
+                if (!response.headers().allValues("Content-Type").any { it.startsWith("text") }) {
+                    return PageFetchResult.NotTextPage(responseUri)
+                }
+
+                val htmlString = response.body() ?: ""
+                val document = Jsoup.parse(htmlString)
+                val title = document.title().ifEmpty { responseUri.toString() }
+
+                document.select("a")
+                    .asSequence()
+                    .mapNotNull { it.attr("href") }
+                    .filterNot { it.startsWith("#") }
+                    .mapNotNull {
+                        try {
+                            responseUri.resolve(it)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }.filterNot { visitedUris.contains(it) }
+                    .toList()
+                    .shuffled()
+                    .forEach { uriQueue.add(it) }
+
+                while (uriQueue.size() > MAX_SET_SIZE) {
+                    uriQueue.remove(uriQueue.getRandom())
+                }
+
+                return PageFetchResult.TextPage(responseUri, title, document.text())
+            } catch (e: Exception) {
+                return PageFetchResult.RequestError(uri, e)
+            }
+        }
     }
 
-    data class PageInfo(val uri: URI, val name: String, val content: String)
+    const val MAX_SET_SIZE = 500
+
+    sealed class PageFetchResult(val uri: URI) {
+        class TextPage(uri: URI, val name: String, val content: String) : PageFetchResult(uri)
+        class NotTextPage(uri: URI) : PageFetchResult(uri)
+        class RequestError(uri: URI, val exception: Exception) : PageFetchResult(uri)
+    }
 }
