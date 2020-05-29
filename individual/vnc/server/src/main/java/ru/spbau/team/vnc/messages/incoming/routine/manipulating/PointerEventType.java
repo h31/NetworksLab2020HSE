@@ -1,4 +1,4 @@
-package ru.spbau.team.vnc.messages.incoming.routine;
+package ru.spbau.team.vnc.messages.incoming.routine.manipulating;
 
 public enum PointerEventType {
     LEFT_UP, LEFT_DOWN,

@@ -3,6 +3,7 @@ package ru.spbau.team.vnc.messages.incoming.routine;
 import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
 import ru.spbau.team.vnc.messages.incoming.FormattedReader;
+import ru.spbau.team.vnc.messages.incoming.routine.manipulating.PointerEventType;
 
 import java.awt.AWTException;
 import java.awt.Robot;
@@ -13,9 +14,9 @@ import java.util.BitSet;
 import java.util.List;
 
 public class PointerEventMessage extends RoutineMessage {
-    private List<PointerEventType> eventTypes;
-    private int xPosition;
-    private int yPosition;
+    private final List<PointerEventType> eventTypes;
+    private final int xPosition;
+    private final int yPosition;
 
     public PointerEventMessage(int xPosition, int yPosition, List<PointerEventType> eventTypes) {
         this.xPosition = xPosition;
@@ -34,30 +35,27 @@ public class PointerEventMessage extends RoutineMessage {
     }
 
     @Override
-    public void execute(Connection connection) throws AWTException, IOException {
+    public void execute(Connection connection) throws AWTException {
         Robot robot = new Robot();
         robot.mouseMove(xPosition, yPosition);
         for (PointerEventType eventType : eventTypes) {
             if (eventType == PointerEventType.LEFT_DOWN) {
                 robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
-            }
-            if (eventType == PointerEventType.LEFT_UP) {
+            } else if (eventType == PointerEventType.LEFT_UP) {
                 robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
-            }
-            if (eventType == PointerEventType.MIDDLE_DOWN) {
+            } else if (eventType == PointerEventType.MIDDLE_DOWN) {
                 robot.mousePress(InputEvent.BUTTON2_DOWN_MASK);
-            }
-            if (eventType == PointerEventType.MIDDLE_UP) {
+            } else if (eventType == PointerEventType.MIDDLE_UP) {
                 robot.mouseRelease(InputEvent.BUTTON2_DOWN_MASK);
-            }
-            if (eventType == PointerEventType.RIGHT_DOWN) {
+            } else if (eventType == PointerEventType.RIGHT_DOWN) {
                 robot.mousePress(InputEvent.BUTTON3_DOWN_MASK);
-            }
-            if (eventType == PointerEventType.RIGHT_UP) {
+            } else if (eventType == PointerEventType.RIGHT_UP) {
                 robot.mouseRelease(InputEvent.BUTTON3_DOWN_MASK);
+            } else if (eventType == PointerEventType.WHEEL_DOWNWARDS_DOWN) {
+                robot.mouseWheel(1);
+            } else if (eventType == PointerEventType.WHEEL_UPWARDS_DOWN) {
+                robot.mouseWheel(-1);
             }
-
-            // TODO: scroll
         }
     }
 

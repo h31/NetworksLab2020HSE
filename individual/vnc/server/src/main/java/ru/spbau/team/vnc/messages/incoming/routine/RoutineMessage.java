@@ -22,8 +22,7 @@ public abstract class RoutineMessage {
         } else if (messageType == 3) {
             return FrameBufferUpdateRequestMessage.fromInputStream(inputStream);
         } else if (messageType == 4) {
-            // TODO KeyEvent
-            inputStream.readNBytes(7);
+            return KeyEventMessage.fromInputStream(inputStream);
         } else if (messageType == 5) {
             return PointerEventMessage.fromInputStream(inputStream);
         } else if (messageType == 6) {
