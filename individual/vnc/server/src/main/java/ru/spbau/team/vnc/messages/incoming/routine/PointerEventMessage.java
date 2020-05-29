@@ -3,7 +3,6 @@ package ru.spbau.team.vnc.messages.incoming.routine;
 import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
 import ru.spbau.team.vnc.messages.incoming.FormattedReader;
-import ru.spbau.team.vnc.messages.incoming.routine.manipulating.PointerEventType;
 
 import java.awt.AWTException;
 import java.awt.Robot;

@@ -27,7 +27,6 @@ public class KeyConverter {
 
     private static final int Cancel		= 0xFF69;
     private static final int Help		= 0xFF6A;
-    private static final int NumLock	= 0xFF6F;
 
     private static final int KpSpace	= 0xFF80;
     private static final int KpTab		= 0xFF89;
@@ -84,7 +83,6 @@ public class KeyConverter {
     private static final int ShiftR		= 0xFFE2;
     private static final int ControlL	= 0xFFE3;
     private static final int ControlR	= 0xFFE4;
-    private static final int CapsLock	= 0xFFE5;
     private static final int MetaL		= 0xFFE7;
     private static final int MetaR		= 0xFFE8;
     private static final int AltL		= 0xFFE9;
@@ -155,8 +153,6 @@ public class KeyConverter {
                 return KeyEvent.VK_CANCEL;
             case Help:
                 return KeyEvent.VK_HELP;
-            case NumLock:
-                return KeyEvent.VK_NUM_LOCK;
             case KpSpace:
                 return KeyEvent.VK_SPACE;
             case KpEqual: 
@@ -240,8 +236,6 @@ public class KeyConverter {
             case AltL:
             case AltR:
                 return KeyEvent.VK_ALT;
-            case CapsLock: 
-                return KeyEvent.VK_CAPS_LOCK; 
 
             default: 
                 return KeyEvent.VK_UNDEFINED;

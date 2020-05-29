@@ -26,7 +26,7 @@ public abstract class RoutineMessage {
         } else if (messageType == 5) {
             return PointerEventMessage.fromInputStream(inputStream);
         } else if (messageType == 6) {
-            // TODO ClientCutText
+            return CutTextMessage.fromInputStream(inputStream);
         } else {
             // TODO: throw something
         }
