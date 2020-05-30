@@ -35,7 +35,7 @@ void Client::Serve() {
         }
 
         std::cerr << buffer.data() << std::endl;
-        server->Notify(buffer.data());
+        server->Notify(reinterpret_cast<std::string*>(buffer.data()));
     }
 }
 
