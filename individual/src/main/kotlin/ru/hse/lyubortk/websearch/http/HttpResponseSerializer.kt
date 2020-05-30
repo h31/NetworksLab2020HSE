@@ -1,6 +1,9 @@
 package ru.hse.lyubortk.websearch.http
 
-object HttpMessageSerializer {
+object HttpResponseSerializer {
+    private val CRLF = "\r\n".toByteArray().toList()
+    private const val SP = ' '.toByte()
+
     fun serialize(response: HttpResponse): List<Byte> {
         val bytes = mutableListOf<Byte>()
         bytes.addAll(response.httpVersion.toByteArray().toList())
@@ -22,7 +25,4 @@ object HttpMessageSerializer {
         response.body?.let { bytes.addAll(it) }
         return bytes
     }
-
-    private val CRLF = "\r\n".toByteArray().toList()
-    private const val SP = ' '.toByte()
 }

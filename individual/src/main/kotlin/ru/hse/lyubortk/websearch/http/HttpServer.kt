@@ -9,65 +9,72 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
     private val log = LoggerFactory.getLogger(HttpServer::class.java)
 
     private val serverSocket = ServerSocket(port)
-    private val clientHandlerThreadPool = Executors.newFixedThreadPool(5)
+    private val clientHandlerThreadPool = Executors.newCachedThreadPool()
     private val listenerThreadExecutor = Executors.newSingleThreadExecutor().also {
         it.submit(this::listenServerSocket)
     }
-    private val parser = HttpMessageParser()
 
-    // ADD TRY CATCH
     private fun listenServerSocket() {
-        while (true) {
-            val socket = serverSocket.accept()
-            clientHandlerThreadPool.submit { processClient(socket) }
+        try {
+            while (true) {
+                val socket = serverSocket.accept()
+                clientHandlerThreadPool.submit { processClient(socket) }
+            }
+        } catch (e: Exception) {
+            log.error("Exception in server socket listener", e)
+            throw e
         }
     }
 
-    // ADD TRY CATCH
     private fun processClient(socket: Socket) {
-        val context = parser.createConnectionContext()
-        val inputStream = socket.getInputStream()
-        val outputStream = socket.getOutputStream()
-        val byteArray = ByteArray(512)
-        var bytesRead = inputStream.read(byteArray)
-        while (bytesRead > 0) {
-            when (val result = parser.parseRequests(context, byteArray.take(bytesRead))) {
-                EncodingNotImplemented -> {
-                    val response = processor.getNotImplementedResponse()
-                    outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
-                    closeConnection(socket)
-                    return
-                }
-                ParseError -> {
-                    val response = processor.getBadRequestResponse()
-                    outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
-                    closeConnection(socket)
-                    return
-                }
-                is ParsedRequests -> {
-                    for (request in result.requests) {
-                        val (response, action) = processor.processRequest(request)
-                        outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
-                        if (action == ConnectionAction.CLOSE) {
-                            closeConnection(socket)
-                            return
+        try {
+            socket.soTimeout = SOCKET_READ_TIMEOUT_MILLIS
+            val context = HttpMessageParser.createConnectionContext()
+            val inputStream = socket.getInputStream()
+            val outputStream = socket.getOutputStream()
+            val byteArray = ByteArray(BUFFER_SIZE)
+            var bytesRead = inputStream.read(byteArray)
+            var finished = false
+            while (bytesRead > 0 && !finished) {
+                when (val result = HttpMessageParser.parseRequests(context, byteArray.take(bytesRead))) {
+                    EncodingNotImplemented -> {
+                        val response = processor.getNotImplementedResponse()
+                        outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                        finished = true
+                    }
+                    ParseError -> {
+                        val response = processor.getBadRequestResponse()
+                        outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                        finished = true
+                    }
+                    is ParsedRequests -> {
+                        requests@ for (request in result.requests) {
+                            val (response, action) = processor.processRequest(request)
+                            outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                            if (action == ConnectionAction.CLOSE) {
+                                finished = true
+                                break@requests
+                            }
                         }
                     }
                 }
+                bytesRead = inputStream.read(byteArray)
             }
-            bytesRead = inputStream.read(byteArray)
+            closeConnection(socket)
+        } catch (e: Exception) {
+            log.error("Exception while processing client ${socket.inetAddress}", e)
+            if (!socket.isClosed) {
+                socket.close()
+            }
+            throw e
         }
-
-        // TODO 400
-        closeConnection(socket)
     }
 
-    // ADD TRY CATCH
     private fun closeConnection(socket: Socket) {
         val inputStream = socket.getInputStream()
         socket.shutdownOutput()
 
-        val byteArray = ByteArray(512)
+        val byteArray = ByteArray(BUFFER_SIZE)
         val startTime = System.currentTimeMillis()
         var bytesRead = inputStream.read(byteArray)
         while (bytesRead > 0 && (System.currentTimeMillis() - startTime < HALF_CLOSE_TIMEOUT_MILLIS)) {
@@ -81,6 +88,8 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
 
     companion object {
         private const val HALF_CLOSE_TIMEOUT_MILLIS = 10_000
+        private const val BUFFER_SIZE = 512
+        private const val SOCKET_READ_TIMEOUT_MILLIS = 15_000
     }
 }
 

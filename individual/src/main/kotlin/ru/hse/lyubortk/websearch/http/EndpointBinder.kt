@@ -2,7 +2,6 @@ package ru.hse.lyubortk.websearch.http
 
 interface EndpointBinder {
     fun get(path: String, routeHandler: (RequestContext) -> Unit)
-
     fun post(path: String, routeHandler: (RequestContext) -> Unit)
 }
 
