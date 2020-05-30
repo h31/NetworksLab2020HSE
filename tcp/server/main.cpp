@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    uint16_t portno = (uint16_t) atoi(argv[1]);
+    uint16_t portno = (uint16_t) std::stoi(argv[1]);
     Server srv(portno);
     srv.Serve();
 
