@@ -15,6 +15,15 @@
 #include <iostream>
 #include <atomic>
 
+namespace {
+    void printMessage(std::time_t time, const std::string& name, const std::string& message) {
+        char buffer[10];
+        std::tm* ptm = std::localtime(&time);
+        std::strftime(buffer, 10, "%H:%M", ptm);
+        printf("<%s> [%s] %s\n", buffer, name.c_str(), message.c_str());
+    }
+}
+
 Client::Client(const char* hostname, const char* port, const char* name) : m_name(name) {
     addrinfo hints = {};
     hints.ai_family = AF_INET;
@@ -65,28 +74,36 @@ Client::~Client() {
     stop();
 }
 
+std::optional<std::string> Client::readString(char (& lengthBuffer)[4]) const {
+    if (readFullBuffer(m_socketFD, lengthBuffer, 4) == 0) {
+        const auto nameLength = intFromArray<uint32_t>(lengthBuffer);
+        std::vector<char> str(nameLength + 1, 0);
+        if (readFullBuffer(m_socketFD, str.data(), nameLength) == 0) {
+            return std::string(str.data());
+        }
+    }
+    return {};
+}
+
+std::optional<std::time_t> Client::readTime(char (& timeBuffer)[8]) const {
+    if (readFullBuffer(m_socketFD, timeBuffer, 8) == 0) {
+        return static_cast<std::time_t>(intFromArray<uint64_t>(timeBuffer));
+    }
+    return {};
+}
+
 void Client::read_routine() {
     char timeBuffer[8];
     char lengthBuffer[4];
     while (true) {
-        if (readFullBuffer(m_socketFD, timeBuffer, 8) == 0 && readFullBuffer(m_socketFD, lengthBuffer, 4) == 0) {
-            auto time = static_cast<std::time_t>(intFromArray<uint64_t>(timeBuffer));
-            const auto nameLength = intFromArray<uint32_t>(lengthBuffer);
-            std::vector<char> name(nameLength + 1, 0);
-            if (readFullBuffer(m_socketFD, name.data(), nameLength) == 0
-                && readFullBuffer(m_socketFD, lengthBuffer, 4) == 0) {
-                const auto messageLength = intFromArray<uint32_t>(lengthBuffer);
-                std::vector<char> message(messageLength + 1, 0);
-                if (readFullBuffer(m_socketFD, message.data(), messageLength) == 0) {
-                    char buffer[10];
-                    std::tm* ptm = std::localtime(&time);
-                    std::strftime(buffer, 10, "%H:%M", ptm);
-                    printf("<%s> [%s] %s\n", buffer, name.data(), message.data());
-                    continue;
-                }
-            }
-
+        const auto time = readTime(timeBuffer);
+        const auto name = readString(lengthBuffer);
+        const auto message = readString(lengthBuffer);
+        if (time && name && message) {
+            printMessage(time.value(), name.value(), message.value());
+            continue;
         }
+
         std::cout << "<Exit. Please press enter.>" << std::endl;
         stop();
         return;

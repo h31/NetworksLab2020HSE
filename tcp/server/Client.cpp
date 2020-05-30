@@ -40,10 +40,11 @@ void Client::run() {
     char length_buffer[4];
 
     while (!m_stop) {
-        if (readFullBuffer(m_socketFD, length_buffer, 4) == 0) {
+        int ret;
+        if ((ret = readFullBuffer(m_socketFD, length_buffer, 4)) == 0) {
             auto length = intFromArray<uint32_t>(length_buffer);
             Message message(length);
-            if (readFullBuffer(m_socketFD, message.writeDst(), length) == 0) {
+            if ((ret = readFullBuffer(m_socketFD, message.writeDst(), length)) == 0) {
                 m_server->newMessage(message);
                 continue;
             }
@@ -51,7 +52,11 @@ void Client::run() {
         if (m_stop) {
             return;
         }
-        std::cerr << "Error while reading from client." << std::endl;
+        if (ret == 1) {
+            std::cerr << "Client disconnected." << std::endl;
+        } else {
+            std::cerr << "Error while reading from client." << std::endl;
+        }
         shutdown();
         return;
     }

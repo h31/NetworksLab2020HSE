@@ -20,7 +20,8 @@ int readFullBuffer(int socketFD, char* buffer, std::size_t length) {
     unsigned int i = 0;
     while (i < length) {
         auto x = read(socketFD, buffer + i, length - i);
-        if (x <= 0) return -1;
+        if (x < 0) return 2;
+        if (x == 0) return 1;
         i += x;
     }
     return 0;

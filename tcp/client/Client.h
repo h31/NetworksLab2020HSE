@@ -1,6 +1,7 @@
 #pragma once
 
 #include <thread>
+#include <optional>
 
 class Client {
 public:
@@ -19,4 +20,8 @@ private:
     void write_routine();
 
     void stop();
+
+    std::optional<std::string> readString(char (&)[4]) const;
+
+    std::optional<std::time_t> readTime(char (&)[8]) const;
 };

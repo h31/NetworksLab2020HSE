@@ -7,7 +7,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    uint16_t port = atoi(argv[1]);
+    uint16_t port = std::stoi(argv[1]);
 
     Server server(port);
 
