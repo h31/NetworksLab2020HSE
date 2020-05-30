@@ -1,9 +1,11 @@
 package ru.hse.lyubortk.websearch
 
 import io.javalin.Javalin
-import ru.hse.lyubortk.websearch.api.RequestHandler
-import ru.hse.lyubortk.websearch.api.html.FrontPage
+import ru.hse.lyubortk.websearch.api.SearchApi
 import ru.hse.lyubortk.websearch.core.Searcher
+import ru.hse.lyubortk.websearch.http.HttpServer
+import ru.hse.lyubortk.websearch.http.JavalinEndpointBinderAdapter
+import ru.hse.lyubortk.websearch.http.RequestProcessor
 
 fun printUsage() = println(
     """
@@ -24,15 +26,18 @@ fun main(args: Array<String>) {
         return
     }
 
-    when (args[1]) {
-        "javalin" -> Unit
-        "custom" -> Unit
+    val server = when (args[1]) {
+        "javalin" -> JavalinEndpointBinderAdapter(Javalin.create().start(port))
+        "custom" -> {
+            val requestProcessor = RequestProcessor()
+            val httpServer = HttpServer(port, requestProcessor)
+            requestProcessor
+        }
         else -> {
             printUsage()
             return
         }
     }
 
-    val javalin = Javalin.create().start(port)
-    RequestHandler(javalin, Searcher())
+    SearchApi(server, Searcher())
 }

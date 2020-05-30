@@ -2,10 +2,10 @@ package ru.hse.lyubortk.websearch.api.html
 
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
-import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_FORM_PARAM
-import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.ADD_PATH
-import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_PATH
-import ru.hse.lyubortk.websearch.api.RequestHandler.Companion.SEARCH_QUERY_PARAM
+import ru.hse.lyubortk.websearch.api.SearchApi.Companion.ADD_FORM_PARAM
+import ru.hse.lyubortk.websearch.api.SearchApi.Companion.ADD_PATH
+import ru.hse.lyubortk.websearch.api.SearchApi.Companion.SEARCH_PATH
+import ru.hse.lyubortk.websearch.api.SearchApi.Companion.SEARCH_QUERY_PARAM
 import ru.hse.lyubortk.websearch.core.Searcher.Companion.SearcherStats
 import ru.hse.lyubortk.websearch.core.Searcher.Companion.SearchResult
 
