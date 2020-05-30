@@ -11,6 +11,7 @@ import org.apache.lucene.index.Term
 import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.MMapDirectory
+import org.slf4j.LoggerFactory
 import ru.hse.lyubortk.websearch.crawler.Crawler
 import ru.hse.lyubortk.websearch.crawler.Crawler.PageFetchResult.*
 import java.net.URI
@@ -20,6 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 //TODO: move field names to constants
 class Searcher : AutoCloseable {
+    private val log = LoggerFactory.getLogger(Searcher::class.java)
+
     private val index: Directory = MMapDirectory(Path.of(LUCENE_PATH))
     private val analyzer = StandardAnalyzer()
     private val indexWriterConfig = IndexWriterConfig(analyzer)
@@ -29,6 +32,7 @@ class Searcher : AutoCloseable {
     private val indexingThreadPool = Executors.newFixedThreadPool(INDEXING_THREADS)
 
     fun search(text: String): SearchResult {
+        log.info("Searching for \"$text\"")
         DirectoryReader.open(index).use { indexReader ->
             val indexSearcher = IndexSearcher(indexReader)
             val booleanQueryBuilder = BooleanQuery.Builder()
@@ -55,6 +59,7 @@ class Searcher : AutoCloseable {
     }
 
     fun startIndexing(uri: URI): StartIndexingResult {
+        log.info("Starting indexing from $uri")
         val newIndexingNumber = indexingInProgress.incrementAndGet()
         if (newIndexingNumber > MAX_INDEXING_PROCESSES) {
             indexingInProgress.decrementAndGet()
@@ -80,6 +85,7 @@ class Searcher : AutoCloseable {
     }
 
     fun getStats(): SearcherStats {
+        log.info("Getting stats")
         DirectoryReader.open(index).use {
             return SearcherStats(it.maxDoc(), indexingInProgress.get()) // probably faster than numdocs
         }

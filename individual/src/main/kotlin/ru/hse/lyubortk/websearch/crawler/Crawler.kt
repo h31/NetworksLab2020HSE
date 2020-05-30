@@ -1,6 +1,7 @@
 package ru.hse.lyubortk.websearch.crawler
 
 import org.jsoup.Jsoup
+import org.slf4j.LoggerFactory
 import ru.hse.lyubortk.websearch.util.RandomTreeSet
 import java.net.URI
 import java.net.http.HttpClient
@@ -10,6 +11,8 @@ import java.time.Duration
 
 //TODO move 10 to constants
 object Crawler {
+    private val log = LoggerFactory.getLogger(Crawler::class.java)
+
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .followRedirects(HttpClient.Redirect.NORMAL)
@@ -32,11 +35,12 @@ object Crawler {
             if (uriQueue.isEmpty()) {
                 throw NoSuchElementException()
             }
-            val uri = uriQueue.getRandom()
+            val uri: URI = uriQueue.getRandom()
             uriQueue.remove(uri)
 
             try {
                 val request = HttpRequest.newBuilder().uri(uri).GET().timeout(Duration.ofSeconds(10)).build()
+                log.info("Sending GET to $uri")
                 val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
                 val responseUri = response.uri()
                 visitedUris.add(uri)
@@ -70,6 +74,7 @@ object Crawler {
 
                 return PageFetchResult.TextPage(responseUri, title, document.text())
             } catch (e: Exception) {
+                log.error("Exception while trying to get page from $uri")
                 return PageFetchResult.RequestError(uri, e)
             }
         }
