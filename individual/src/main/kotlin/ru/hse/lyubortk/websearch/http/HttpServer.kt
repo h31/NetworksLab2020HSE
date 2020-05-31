@@ -58,7 +58,9 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
                         }
                     }
                 }
-                bytesRead = inputStream.read(byteArray)
+                if (!finished) {
+                    bytesRead = inputStream.read(byteArray)
+                }
             }
             closeConnection(socket)
         } catch (e: Exception) {
@@ -89,7 +91,7 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
     companion object {
         private const val HALF_CLOSE_TIMEOUT_MILLIS = 10_000
         private const val BUFFER_SIZE = 512
-        private const val SOCKET_READ_TIMEOUT_MILLIS = 15_000
+        private const val SOCKET_READ_TIMEOUT_MILLIS = 25_000
     }
 }
 
