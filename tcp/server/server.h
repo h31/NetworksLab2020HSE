@@ -18,7 +18,7 @@ class Server {
 public:
     Server(int port);
     void Serve();
-    void Notify(std::string* msg);
+    void Notify(std::string msg);
 };
 
 

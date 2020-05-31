@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <time.h>
+#include <ctime>
 
 Client::Client(char* hostname, char* port, char* username) {
     this->username = username;
@@ -83,12 +84,15 @@ void Client::listenToServer() {
 void Client::listenToUser() {
     while (true) {
         std::string input;
-        time_t timer;
+        //time_t timer;
+        time_t now = time(0);
         std::getline(std::cin, input);
-        time(&timer);
+        //time(&timer);
+        char* dt = ctime(&now);
 
         //std::cerr << "input: " << input << std::endl;
-        input = "<" + std::to_string(timer) + "> [" + username + "]: " + input;
+        //std::cerr << dt << std::endl;
+        input = "<" + std::string(dt) + "> [" + username + "]: " + input;
         int n = write(sockfd, std::to_string(input.length()).data(), 4);
         if (n < 0) {
             perror("ERROR writing to socket");
