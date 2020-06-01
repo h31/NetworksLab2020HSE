@@ -88,7 +88,8 @@ void Client::listenToUser() {
         time_t now = time(0);
         std::getline(std::cin, input);
         //time(&timer);
-        char* dt = ctime(&now);
+        std::string dt = std::string(ctime(&now));
+        dt.pop_back();
 
         //std::cerr << "input: " << input << std::endl;
         //std::cerr << dt << std::endl;
