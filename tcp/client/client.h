@@ -4,6 +4,8 @@
 
 #include <string>
 
+std::string readMsg(int socket, int len);
+
 class Client {
     int sockfd;
     std::string username;

@@ -68,16 +68,12 @@ void Client::listenToServer() {
         }
 
         int len = strtol(lenBuf, nullptr, 10);
-        std::vector<char> buffer(len + 1, 0);
-        n = read(sockfd, buffer.data(), len);
-        if (n < 0) {
-            perror("ERROR reading from socket");
-            exit(1);
-        }
-        if (n == 0) {
+
+        std::string msg = readMsg(sockfd, len);
+        if (msg == "") {
             break;
         }
-        std::cout << buffer.data() << std::endl;
+        std::cout << msg << std::endl;
     }
 }
 
@@ -105,4 +101,23 @@ void Client::listenToUser() {
             exit(1);
         }
     }
+}
+
+std::string readMsg(int socket, int len) {
+    std::vector<char> buffer(len + 1, 0);
+    int got = 0;
+
+    while (got < len) {
+        int n = read(socket, buffer.data() + got, len - got);
+        if (n == 0) {
+            return "";
+        }
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+        got += n;
+    }
+
+    return buffer.data();
 }
