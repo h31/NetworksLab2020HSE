@@ -1,7 +1,6 @@
 package ru.spbau.team.vnc;
 
 import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
-import ru.spbau.team.vnc.exceptions.InvalidVersionException;
 import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
@@ -36,9 +35,12 @@ public class Connection {
     public void run() {
         try {
             inputStream = new FormattedReader(socket.getInputStream());
-            initConnection();
+            if (!initConnection()) {
+                disconnect();
+                return;
+            }
             routine();
-        } catch (IOException | AWTException | ClientDisconnectedException | InvalidVersionException e) {
+        } catch (IOException | AWTException | ClientDisconnectedException e) {
             System.err.println(e.getMessage());
             e.printStackTrace();
             disconnect();
@@ -62,10 +64,13 @@ public class Connection {
         sendMessage(new FramebufferUpdateMessage(updateRectangles));
     }
 
-    private void initConnection() throws IOException, ClientDisconnectedException, InvalidVersionException {
+    private boolean initConnection() throws IOException, ClientDisconnectedException {
         var selectedVersion = protocolVersionHandshake();
-        securityHandshake(selectedVersion);
+        if (!securityHandshake(selectedVersion)) {
+            return false;
+        }
         initialization();
+        return true;
     }
 
     private void routine() throws IOException, AWTException, ClientDisconnectedException {
@@ -82,18 +87,19 @@ public class Connection {
         return VersionSelectMessage.fromInputStream(socket.getInputStream());
     }
 
-    private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException,
-            ClientDisconnectedException, InvalidVersionException {
+    private boolean securityHandshake(VersionSelectMessage selectedVersion)
+            throws IOException, ClientDisconnectedException {
         if (versionIsNotSupported(selectedVersion)) {
             sendMessage(new SecurityTypesMessage(Collections.emptyList()));
             String errorMessage = "Version " + selectedVersion.getMajorVersion() + "." +
                     selectedVersion.getMinorVersion() + " is not supported";
             sendMessage(new SecurityFailureMessage(errorMessage));
-            throw new InvalidVersionException(errorMessage);
+            System.err.println(errorMessage);
+            return false;
         } else {
             if (selectedVersion.getMinorVersion() == 3) {
                 sendMessage(new SecurityResultMessage(true));
-                return;
+                return true;
             }
 
             sendMessage(new SecurityTypesMessage(Arrays.asList(SecurityType.INVALID, SecurityType.NONE)));
@@ -101,16 +107,20 @@ public class Connection {
 
             if (security.getSecurityType() == SecurityType.INVALID) {
                 sendMessage(new SecurityResultMessage(false));
-                sendMessage(new SecurityFailureMessage("Invalid security code"));
+                String errorMessage = "Invalid security code";
+                sendMessage(new SecurityFailureMessage(errorMessage));
+                System.err.println(errorMessage);
+                return false;
             } else if (security.getSecurityType() == SecurityType.NONE) {
                 if (selectedVersion.getMinorVersion() == 7) {
-                    return;
+                    return true;
                 }
                 sendMessage(new SecurityResultMessage(true));
             } else {
                 // TODO: Authentication
             }
         }
+        return true;
     }
 
     private void initialization() throws IOException, ClientDisconnectedException {
