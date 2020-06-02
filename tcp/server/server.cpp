@@ -52,9 +52,9 @@ void Server::Serve() {
     }
 }
 
-void Server::Notify(std::string msg) {
+void Server::Notify(std::string* msg) {
     for (int i = 0; i < clients.size(); i++) {
-        threads.push_back(std::make_unique<std::thread>(&Client::Notify, clients.back().get(), msg));
+        threads.push_back(std::make_unique<std::thread>(&Client::Notify, clients[i].get(), *msg));
         //clients[i].get()->Notify(msg);
     }
 }

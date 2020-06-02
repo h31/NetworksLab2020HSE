@@ -60,7 +60,7 @@ void Client::Run() {
 void Client::listenToServer() {
     char lenBuf[4];
     while (true) {
-        std::cerr << "start listening\n";
+        //std::cerr << "start listening\n";
         bzero(lenBuf, 4);
         int n = read(sockfd, lenBuf, 4);
         if (n == 0) {
