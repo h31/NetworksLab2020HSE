@@ -33,7 +33,10 @@ public class Server {
                 synchronized (connections) {
                     connections.add(newConnection);
                 }
-                new Thread(newConnection::run).start();
+                new Thread(() -> {
+                        newConnection.run();
+                        disconnect(newConnection);
+                }).start();
             } catch (IOException e) {
                 e.printStackTrace();
                 break;
