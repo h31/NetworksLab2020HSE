@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <iostream>
+#include <mutex>
 #include "client.h"
 #include "server.h"
 
@@ -43,7 +44,10 @@ int Client::GetSocket() {
     return sockfd;
 }
 
+std::mutex mu;
+
 void Client::Notify(std::string msg) {
+    mu.lock();
     int n = write(sockfd, std::to_string(msg.length()).data(), 4);
     if (n < 0) {
         perror("ERROR writing to socket");
@@ -54,4 +58,5 @@ void Client::Notify(std::string msg) {
         perror("ERROR writing to socket");
         exit(1);
     }
+    mu.unlock();
 }
