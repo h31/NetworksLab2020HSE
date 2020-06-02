@@ -25,20 +25,32 @@ void Client::Serve() {
             exit(1);
         }
 
-        std::vector<char> buffer(len + 1, 0);
-        n = read(sockfd, buffer.data(), len);
+        //std::cerr << buffer.data() << std::endl;
+        std::string msg = readMsg(sockfd, len);
+        if (msg == "") {
+            break;
+        }
+        server->Notify(&msg);
+    }
+}
+
+std::string readMsg(int socket, int len) {
+    std::vector<char> buffer(len + 1, 0);
+    int got = 0;
+
+    while (got < len) {
+        int n = read(socket, buffer.data() + got, len - got);
+        if (n == 0) {
+            return "";
+        }
         if (n < 0) {
             perror("ERROR reading from socket");
             exit(1);
         }
-        if (n == 0) {
-            break;
-        }
-
-        std::cerr << buffer.data() << std::endl;
-        std::string msg = buffer.data();
-        server->Notify(&msg);
+        got += n;
     }
+
+    return buffer.data();
 }
 
 int Client::GetSocket() {

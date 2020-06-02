@@ -5,6 +5,8 @@
 
 class Server;
 
+std::string readMsg(int socket, int len);
+
 class Client {
     int sockfd;
     Server* server;
