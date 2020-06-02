@@ -1,6 +1,7 @@
 package ru.spbau.team.vnc;
 
 import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
+import ru.spbau.team.vnc.exceptions.InvalidVersionException;
 import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
@@ -37,7 +38,8 @@ public class Connection {
             inputStream = new FormattedReader(socket.getInputStream());
             initConnection();
             routine();
-        } catch (IOException | AWTException | ClientDisconnectedException e) {
+        } catch (IOException | AWTException | ClientDisconnectedException | InvalidVersionException e) {
+            System.err.println(e.getMessage());
             e.printStackTrace();
             disconnect();
         }
@@ -60,7 +62,7 @@ public class Connection {
         sendMessage(new FramebufferUpdateMessage(updateRectangles));
     }
 
-    private void initConnection() throws IOException, ClientDisconnectedException {
+    private void initConnection() throws IOException, ClientDisconnectedException, InvalidVersionException {
         var selectedVersion = protocolVersionHandshake();
         securityHandshake(selectedVersion);
         initialization();
@@ -80,22 +82,33 @@ public class Connection {
         return VersionSelectMessage.fromInputStream(socket.getInputStream());
     }
 
-    private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException, ClientDisconnectedException {
+    private void securityHandshake(VersionSelectMessage selectedVersion) throws IOException,
+            ClientDisconnectedException, InvalidVersionException {
         if (versionIsNotSupported(selectedVersion)) {
             sendMessage(new SecurityTypesMessage(Collections.emptyList()));
             String errorMessage = "Version " + selectedVersion.getMajorVersion() + "." +
                     selectedVersion.getMinorVersion() + " is not supported";
             sendMessage(new SecurityFailureMessage(errorMessage));
-            // TODO throw
+            throw new InvalidVersionException(errorMessage);
         } else {
+            if (selectedVersion.getMinorVersion() == 3) {
+                sendMessage(new SecurityResultMessage(true));
+                return;
+            }
+
             sendMessage(new SecurityTypesMessage(Arrays.asList(SecurityType.INVALID, SecurityType.NONE)));
             var security = SecuritySelectMessage.fromInputStream(inputStream);
-            // TODO: use security
-            if (security.getSecurityType().equals(SecurityType.INVALID)) {
+
+            if (security.getSecurityType() == SecurityType.INVALID) {
                 sendMessage(new SecurityResultMessage(false));
                 sendMessage(new SecurityFailureMessage("Invalid security code"));
-            } else  {
+            } else if (security.getSecurityType() == SecurityType.NONE) {
+                if (selectedVersion.getMinorVersion() == 7) {
+                    return;
+                }
                 sendMessage(new SecurityResultMessage(true));
+            } else {
+                // TODO: Authentication
             }
         }
     }
@@ -109,8 +122,8 @@ public class Connection {
     }
 
     private boolean versionIsNotSupported(VersionSelectMessage selectedVersion) {
-        // TODO: support 3.3, 3.7, 3.x
-        return selectedVersion.getMajorVersion() != 3 || selectedVersion.getMinorVersion() != 8;
+        return selectedVersion.getMajorVersion() != 3 || (selectedVersion.getMinorVersion() != 3 &&
+                selectedVersion.getMinorVersion() != 7 && selectedVersion.getMinorVersion() != 8);
     }
 
     private void sendMessage(OutcomingMessage message) throws IOException {
