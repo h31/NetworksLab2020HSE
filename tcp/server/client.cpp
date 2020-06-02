@@ -1,7 +1,7 @@
 #include <strings.h>
 #include <cstdio>
 #include <cstdlib>
-#include <zconf.h>
+#include <unistd.h>
 #include <iostream>
 #include "client.h"
 #include "server.h"
