@@ -54,16 +54,7 @@ void Server::Serve() {
 
 void Server::Notify(std::string msg) {
     for (int i = 0; i < clients.size(); i++) {
-        int socket = clients[i].get()->GetSocket();
-        int n = write(socket, std::to_string(msg.length()).data(), 4);
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
-        }
-        n = write(socket, msg.data(), msg.length()); // send on Windows
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
-        }
+        threads.push_back(std::make_unique<std::thread>(&Client::Notify, clients.back().get(), msg));
+        //clients[i].get()->Notify(msg);
     }
 }

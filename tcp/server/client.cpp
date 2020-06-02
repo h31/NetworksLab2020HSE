@@ -39,7 +39,19 @@ void Client::Serve() {
     }
 }
 
-
 int Client::GetSocket() {
     return sockfd;
+}
+
+void Client::Notify(std::string msg) {
+    int n = write(sockfd, std::to_string(msg.length()).data(), 4);
+    if (n < 0) {
+        perror("ERROR writing to socket");
+        exit(1);
+    }
+    n = write(sockfd, msg.data(), msg.length());
+    if (n < 0) {
+        perror("ERROR writing to socket");
+        exit(1);
+    }
 }
