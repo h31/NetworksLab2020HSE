@@ -43,40 +43,8 @@ public class PixelFormat {
         return bitsPerPixel;
     }
 
-    public int getDepth() {
-        return depth;
-    }
-
     public boolean isBigEndian() {
         return bigEndian;
-    }
-
-    public boolean isTrueColor() {
-        return trueColor;
-    }
-
-    public int getRedMax() {
-        return redMax;
-    }
-
-    public int getGreenMax() {
-        return greenMax;
-    }
-
-    public int getBlueMax() {
-        return blueMax;
-    }
-
-    public int getRedShift() {
-        return redShift;
-    }
-
-    public int getGreenShift() {
-        return greenShift;
-    }
-
-    public int getBlueShift() {
-        return blueShift;
     }
 
     public byte[] toByteArray() throws IOException {
@@ -92,7 +60,7 @@ public class PixelFormat {
             outputStream.writeByte(greenShift);
             outputStream.writeByte(blueShift);
             // padding
-            outputStream.writeBytes(new byte[] { 0, 0, 0 });
+            outputStream.writeBytes(new byte[] {0, 0, 0});
 
             return outputStream.toByteArray();
         }

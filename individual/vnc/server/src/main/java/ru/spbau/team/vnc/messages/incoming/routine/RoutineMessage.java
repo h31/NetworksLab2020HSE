@@ -13,10 +13,8 @@ public abstract class RoutineMessage {
             throws IOException, ClientDisconnectedException {
         int messageType = inputStream.readU8();
 
-        //System.out.println("Got message with code " + messageType);
         if (messageType == 0) {
-            // TODO SetPixelFormat
-            inputStream.readNBytes(19);
+            return SetPixelFormatMessage.fromInputStream(inputStream);
         } else if (messageType == 2) {
             return SetEncodingsMessage.fromInputStream(inputStream);
         } else if (messageType == 3) {
@@ -28,10 +26,9 @@ public abstract class RoutineMessage {
         } else if (messageType == 6) {
             return CutTextMessage.fromInputStream(inputStream);
         } else {
-            // TODO: throw something
+            return null;
         }
-        return null;
     }
 
-    abstract public void execute(Connection connection) throws AWTException, IOException;
+    public abstract void execute(Connection connection) throws AWTException, IOException;
 }

@@ -24,7 +24,7 @@ public class CutTextMessage extends RoutineMessage {
         long size = inputStream.readU32BigEndian();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < size; i++) {
-            sb.append((char)inputStream.readU8());
+            sb.append((char) inputStream.readU8());
         }
 
         return new CutTextMessage(sb.toString());

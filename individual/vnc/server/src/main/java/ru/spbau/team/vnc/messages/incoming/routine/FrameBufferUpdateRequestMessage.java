@@ -21,8 +21,6 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
         this.yPosition = yPosition;
         this.width = width;
         this.height = height;
-
-        //System.out.println("Update " + incremental + " " + xPosition + " " + yPosition + " " + width + " " + height);
     }
 
     public static FrameBufferUpdateRequestMessage fromInputStream(FormattedReader inputStream)
@@ -38,27 +36,6 @@ public class FrameBufferUpdateRequestMessage extends RoutineMessage {
 
     @Override
     public void execute(Connection connection) throws AWTException, IOException {
-        // TODO: Normal send
         connection.sendRawUpdate();
-    }
-
-    public boolean isIncremental() {
-        return incremental;
-    }
-
-    public int getXPosition() {
-        return xPosition;
-    }
-
-    public int getYPosition() {
-        return yPosition;
-    }
-
-    public int getWidth() {
-        return width;
-    }
-
-    public int getHeight() {
-        return height;
     }
 }

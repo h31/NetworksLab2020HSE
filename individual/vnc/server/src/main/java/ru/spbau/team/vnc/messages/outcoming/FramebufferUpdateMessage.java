@@ -8,7 +8,7 @@ import java.util.List;
 
 public class FramebufferUpdateMessage implements OutcomingMessage {
 
-    private static final int messageCode = 0;
+    private static final int MESSAGE_CODE = 0;
 
     private final List<FramebufferUpdateRectangle> rectangles;
 
@@ -19,7 +19,7 @@ public class FramebufferUpdateMessage implements OutcomingMessage {
     @Override
     public byte[] toByteArray() throws IOException {
         try (var outputStream = new FormattedByteArrayWriter(new ByteArrayOutputStream())) {
-            outputStream.writeByte(messageCode);
+            outputStream.writeByte(MESSAGE_CODE);
             outputStream.writeByte(0); // padding
             outputStream.writeU16BigEndian(rectangles.size());
 

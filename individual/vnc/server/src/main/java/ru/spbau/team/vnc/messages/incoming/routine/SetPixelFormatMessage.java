@@ -4,7 +4,6 @@ import ru.spbau.team.vnc.Connection;
 import ru.spbau.team.vnc.exceptions.ClientDisconnectedException;
 import ru.spbau.team.vnc.messages.incoming.FormattedReader;
 
-import java.awt.*;
 import java.io.IOException;
 
 public class SetPixelFormatMessage extends RoutineMessage {
@@ -25,7 +24,7 @@ public class SetPixelFormatMessage extends RoutineMessage {
     }
 
     @Override
-    public void execute(Connection connection) throws AWTException, IOException {
+    public void execute(Connection connection) {
         // TODO: we need to support encodings first
     }
 }

@@ -24,12 +24,7 @@ public class FormattedByteArrayWriter extends OutputStream {
 
     private static byte[] toBigEndian16(int x) {
         byte[] bigEndian32 = toBigEndian32(x);
-        return new byte[] { bigEndian32[2], bigEndian32[3] };
-    }
-
-    private static byte[] toLittleEndian16(int x) {
-        byte[] bigEndian16 = toBigEndian16(x);
-        return new byte[] { bigEndian16[1], bigEndian16[0] };
+        return new byte[] {bigEndian32[2], bigEndian32[3]};
     }
 
     private static byte toByte(boolean x) {

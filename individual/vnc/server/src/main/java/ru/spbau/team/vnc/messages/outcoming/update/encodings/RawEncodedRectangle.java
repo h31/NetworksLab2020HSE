@@ -8,7 +8,7 @@ import java.io.IOException;
 
 public class RawEncodedRectangle implements EncodedRectangle {
 
-    private static final int encodingType = 0;
+    private static final int ENCODING_TYPE = 0;
     private final int[] pixels;
     private final PixelFormat pixelFormat;
 
@@ -19,7 +19,7 @@ public class RawEncodedRectangle implements EncodedRectangle {
 
     @Override
     public int getEncodingType() {
-        return encodingType;
+        return ENCODING_TYPE;
     }
 
     @Override
@@ -37,7 +37,7 @@ public class RawEncodedRectangle implements EncodedRectangle {
                 } else if (pixelFormat.getBitsPerPixel() == 8) {
                     outputStream.writeByte(printingPixel);
                 } else {
-                    // TODO: throw
+                    throw new RuntimeException("Unexpected pixel format: " + pixelFormat.getBitsPerPixel());
                 }
             }
             return outputStream.toByteArray();

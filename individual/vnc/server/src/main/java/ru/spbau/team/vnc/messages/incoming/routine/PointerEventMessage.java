@@ -26,7 +26,7 @@ public class PointerEventMessage extends RoutineMessage {
     public static PointerEventMessage fromInputStream(FormattedReader inputStream)
             throws IOException, ClientDisconnectedException {
         int mask = inputStream.readU8();
-        List<PointerEventType> eventTypes = fromMask((byte)mask);
+        List<PointerEventType> eventTypes = fromMask((byte) mask);
         int xPosition = inputStream.readU16BigEndian();
         int yPosition = inputStream.readU16BigEndian();
 

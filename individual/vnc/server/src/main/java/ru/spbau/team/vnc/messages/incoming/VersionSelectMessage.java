@@ -9,7 +9,7 @@ public class VersionSelectMessage {
     private final int majorVersion;
     private final int minorVersion;
 
-    private static final int expectedBytes = "RFB xxx.yyy\n".length();
+    private static final int EXPECTED_BYTES = "RFB xxx.yyy\n".length();
 
     private VersionSelectMessage(int majorVersion, int minorVersion) {
         this.majorVersion = majorVersion;
@@ -25,7 +25,7 @@ public class VersionSelectMessage {
     }
 
     public static VersionSelectMessage fromInputStream(InputStream inputStream) throws IOException {
-        var buffer = inputStream.readNBytes(expectedBytes);
+        var buffer = inputStream.readNBytes(EXPECTED_BYTES);
         // TODO: check read number of bytes
         var versionSelectString = new String(buffer, StandardCharsets.US_ASCII);
         System.out.println("Received version select message:\n" + versionSelectString);

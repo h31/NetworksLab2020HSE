@@ -9,8 +9,8 @@ import java.util.Scanner;
 
 public class Server {
 
-    public final static int MAJOR_VERSION = 3;
-    public final static int MINOR_VERSION = 8;
+    public static final int MAJOR_VERSION = 3;
+    public static final int MINOR_VERSION = 8;
 
     private final ServerSocket socket;
     /* True if there is client with false as shared flag */
@@ -83,7 +83,7 @@ public class Server {
 
     public void disconnect(Connection connection) {
         synchronized (connections) {
-            if (connection == privateConnection) {
+            if (connection.equals(privateConnection)) {
                 privateConnection = null;
                 hasPrivateClient = false;
             }
@@ -101,7 +101,7 @@ public class Server {
             privateConnection = connection;
             List<Connection> serverConnections = List.copyOf(connections.keySet());
             for (Connection serverConnection : serverConnections) {
-                if (serverConnection != connection) {
+                if (!serverConnection.equals(connection)) {
                     disconnect(serverConnection);
                 }
             }

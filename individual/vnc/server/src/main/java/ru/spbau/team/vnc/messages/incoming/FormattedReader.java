@@ -27,7 +27,7 @@ public class FormattedReader extends InputStream {
     private static int fromBigEndian16(byte[] bigEndian) {
         return ByteBuffer
             .allocate(4)
-            .put(new byte[] { 0, 0 })
+            .put(new byte[] {0, 0})
             .put(bigEndian)
             .order(ByteOrder.BIG_ENDIAN)
             .flip()
@@ -37,7 +37,7 @@ public class FormattedReader extends InputStream {
     private static long fromBigEndianU32(byte[] bigEndian) {
         return ByteBuffer
             .allocate(8)
-            .put(new byte[] { 0, 0, 0, 0 })
+            .put(new byte[] {0, 0, 0, 0})
             .put(bigEndian)
             .order(ByteOrder.BIG_ENDIAN)
             .flip()
@@ -73,8 +73,7 @@ public class FormattedReader extends InputStream {
         if (buffer.length != 1) {
             throw new ClientDisconnectedException();
         }
-        // TODO: normal cast to int. NB! just cast doesn't work because of sign
-        return fromBigEndian16(new byte[] { 0, buffer[0] });
+        return fromBigEndian16(new byte[] {0, buffer[0]});
     }
 
     public boolean readBoolean() throws IOException, ClientDisconnectedException {

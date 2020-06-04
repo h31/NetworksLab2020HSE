@@ -24,7 +24,7 @@ public class KeyEventMessage extends RoutineMessage {
         boolean downFlag = inputStream.readU8() != 0;
         inputStream.readU8();
         inputStream.readU8();
-        int key = (int)inputStream.readU32BigEndian();
+        int key = (int) inputStream.readU32BigEndian();
 
         return new KeyEventMessage(downFlag, key);
     }

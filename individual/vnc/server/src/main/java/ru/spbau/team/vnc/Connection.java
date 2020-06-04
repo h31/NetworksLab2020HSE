@@ -6,7 +6,13 @@ import ru.spbau.team.vnc.messages.incoming.ClientInitMessage;
 import ru.spbau.team.vnc.messages.incoming.SecuritySelectMessage;
 import ru.spbau.team.vnc.messages.incoming.VersionSelectMessage;
 import ru.spbau.team.vnc.messages.incoming.routine.RoutineMessage;
-import ru.spbau.team.vnc.messages.outcoming.*;
+import ru.spbau.team.vnc.messages.outcoming.FramebufferUpdateMessage;
+import ru.spbau.team.vnc.messages.outcoming.OutcomingMessage;
+import ru.spbau.team.vnc.messages.outcoming.ProtocolVersionMessage;
+import ru.spbau.team.vnc.messages.outcoming.SecurityFailureMessage;
+import ru.spbau.team.vnc.messages.outcoming.SecurityResultMessage;
+import ru.spbau.team.vnc.messages.outcoming.SecurityTypesMessage;
+import ru.spbau.team.vnc.messages.outcoming.ServerInitMessage;
 import ru.spbau.team.vnc.messages.outcoming.update.FramebufferUpdateRectangle;
 import ru.spbau.team.vnc.messages.outcoming.update.encodings.RawEncodedRectangle;
 import ru.spbau.team.vnc.security.SecurityType;
@@ -36,7 +42,7 @@ public class Connection {
         this.parameters = parameters;
     }
 
-    public boolean isPrivate() {
+    public boolean isPrivateConnection() {
         return isPrivate;
     }
 

@@ -88,18 +88,16 @@ public class KeyConverter {
     private static final int AltL		= 0xFFE9;
     private static final int AltR		= 0xFFEA;
 
-    public static int toVirtualKey(int keysym)
-    {
+    public static int toVirtualKey(int keysym) {
         if ((keysym >= 0x0020 && keysym <= 0x007e) || (keysym >= 0x00a0 && keysym <= 0x00ff)) {
-            return KeyEvent.getExtendedKeyCodeForChar((char)keysym);
+            return KeyEvent.getExtendedKeyCodeForChar((char) keysym);
         }
 
         if ((keysym & 0xff000000) == 0x01000000) {
-            return KeyEvent.getExtendedKeyCodeForChar((char)(keysym & 0x00ffffff));
+            return KeyEvent.getExtendedKeyCodeForChar((char) (keysym & 0x00ffffff));
         }
 
-        switch(keysym)
-        {
+        switch (keysym) {
             case Tab:
             case KpTab:
                 return KeyEvent.VK_TAB;
