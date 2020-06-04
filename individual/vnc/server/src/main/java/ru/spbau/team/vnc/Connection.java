@@ -11,7 +11,9 @@ import ru.spbau.team.vnc.messages.outcoming.update.FramebufferUpdateRectangle;
 import ru.spbau.team.vnc.messages.outcoming.update.encodings.RawEncodedRectangle;
 import ru.spbau.team.vnc.security.SecurityType;
 
-import java.awt.*;
+import java.awt.AWTException;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.Socket;
@@ -25,11 +27,21 @@ public class Connection {
     private final Server server;
     private final Parameters parameters;
     private FormattedReader inputStream;
+    private boolean isPrivate;
+    private volatile boolean stopped;
 
     public Connection(Socket socket, Server server, Parameters parameters) {
         this.socket = socket;
         this.server = server;
         this.parameters = parameters;
+    }
+
+    public boolean isPrivate() {
+        return isPrivate;
+    }
+
+    public void stop() {
+        stopped = true;
     }
 
     public void run() {
@@ -69,12 +81,11 @@ public class Connection {
         if (!securityHandshake(selectedVersion)) {
             return false;
         }
-        initialization();
-        return true;
+        return initialization();
     }
 
     private void routine() throws IOException, AWTException, ClientDisconnectedException {
-        while (true) {
+        while (!stopped) {
             var routineMessage = RoutineMessage.fromInputStream(inputStream);
             if (routineMessage != null) {
                 routineMessage.execute(this);
@@ -123,12 +134,15 @@ public class Connection {
         return true;
     }
 
-    private void initialization() throws IOException, ClientDisconnectedException {
-        var isShared = ClientInitMessage.fromInputStream(inputStream).isShared();
-        if (isShared) {
-            // TODO: disconnect others
+    private boolean initialization() throws IOException, ClientDisconnectedException {
+        isPrivate = !ClientInitMessage.fromInputStream(inputStream).isShared();
+        if (isPrivate) {
+            if (!server.tryShare(this)) {
+                return false;
+            }
         }
         sendMessage(new ServerInitMessage(parameters));
+        return true;
     }
 
     private boolean versionIsNotSupported(VersionSelectMessage selectedVersion) {
