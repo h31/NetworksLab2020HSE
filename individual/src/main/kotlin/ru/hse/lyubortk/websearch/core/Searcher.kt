@@ -19,7 +19,6 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-//TODO: move field names to constants
 class Searcher : AutoCloseable {
     private val log = LoggerFactory.getLogger(Searcher::class.java)
 

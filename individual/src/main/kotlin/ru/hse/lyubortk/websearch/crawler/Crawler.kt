@@ -9,12 +9,14 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 
-//TODO move 10 to constants
 object Crawler {
+    private const val MAX_SET_SIZE = 500
+    private const val TIMEOUT_MILLIS: Long = 10_000
+
     private val log = LoggerFactory.getLogger(Crawler::class.java)
 
     private val httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
+        .connectTimeout(Duration.ofMillis(TIMEOUT_MILLIS))
         .followRedirects(HttpClient.Redirect.NORMAL)
         .build()
 
@@ -39,7 +41,7 @@ object Crawler {
             uriQueue.remove(uri)
 
             try {
-                val request = HttpRequest.newBuilder().uri(uri).GET().timeout(Duration.ofSeconds(10)).build()
+                val request = HttpRequest.newBuilder().uri(uri).GET().timeout(Duration.ofSeconds(TIMEOUT_MILLIS)).build()
                 log.info("Sending GET to $uri")
                 val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
                 val responseUri = response.uri()
@@ -79,8 +81,6 @@ object Crawler {
             }
         }
     }
-
-    const val MAX_SET_SIZE = 500
 
     sealed class PageFetchResult(val uri: URI) {
         class TextPage(uri: URI, val name: String, val content: String) : PageFetchResult(uri)
