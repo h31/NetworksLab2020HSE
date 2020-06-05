@@ -1,7 +1,9 @@
-package ru.hse.lyubortk.websearch.http
+package ru.hse.lyubortk.websearch.http.adapters
 
 import io.javalin.Javalin
 import io.javalin.http.Context
+import ru.hse.lyubortk.websearch.http.EndpointBinder
+import ru.hse.lyubortk.websearch.http.RequestContext
 
 class JavalinEndpointBinderAdapter(private val javalin: Javalin) : EndpointBinder {
     override fun get(path: String, routeHandler: (RequestContext) -> Unit) {

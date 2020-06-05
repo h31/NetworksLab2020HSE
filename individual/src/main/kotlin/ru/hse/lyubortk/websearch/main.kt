@@ -3,9 +3,9 @@ package ru.hse.lyubortk.websearch
 import io.javalin.Javalin
 import ru.hse.lyubortk.websearch.api.SearchApi
 import ru.hse.lyubortk.websearch.core.Searcher
-import ru.hse.lyubortk.websearch.http.HttpServer
-import ru.hse.lyubortk.websearch.http.JavalinEndpointBinderAdapter
-import ru.hse.lyubortk.websearch.http.RequestProcessor
+import ru.hse.lyubortk.websearch.http.implementation.HttpServer
+import ru.hse.lyubortk.websearch.http.adapters.JavalinEndpointBinderAdapter
+import ru.hse.lyubortk.websearch.http.implementation.RequestProcessor
 
 fun printUsage() = println(
     """

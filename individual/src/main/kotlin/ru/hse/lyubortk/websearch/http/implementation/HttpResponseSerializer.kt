@@ -1,4 +1,4 @@
-package ru.hse.lyubortk.websearch.http
+package ru.hse.lyubortk.websearch.http.implementation
 
 object HttpResponseSerializer {
     private val CRLF = "\r\n".toByteArray().toList()

@@ -1,4 +1,4 @@
-package ru.hse.lyubortk.websearch.http
+package ru.hse.lyubortk.websearch.http.implementation
 
 import org.slf4j.LoggerFactory
 import java.net.ServerSocket

@@ -1,4 +1,4 @@
-package ru.hse.lyubortk.websearch.http
+package ru.hse.lyubortk.websearch.http.implementation
 
 import java.util.*
 
