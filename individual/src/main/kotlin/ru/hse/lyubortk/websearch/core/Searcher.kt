@@ -19,7 +19,7 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-class Searcher : AutoCloseable {
+class Searcher(private val crawler: Crawler) : AutoCloseable {
     private val log = LoggerFactory.getLogger(Searcher::class.java)
 
     private val index: Directory = MMapDirectory(Path.of(LUCENE_PATH))
@@ -65,7 +65,7 @@ class Searcher : AutoCloseable {
             return StartIndexingResult.Refused(TO_MANY_INDEXING_PROCESSES_REASON)
         }
 
-        val pageStream = Crawler.getPageStream(uri)
+        val pageStream = crawler.getPageStream(uri)
         return when (val firstPageResult = pageStream.next()) {
             is TextPage -> {
                 addToIndex(firstPageResult)
@@ -115,6 +115,7 @@ class Searcher : AutoCloseable {
             )
         )
         indexWriter.commit()
+        log.info("added to index: ${textPage.uri}")
     }
 
     override fun close() {

@@ -1,5 +1,6 @@
 package ru.hse.lyubortk.websearch.http.implementation
 
+import java.lang.String.CASE_INSENSITIVE_ORDER
 import java.util.*
 
 object HttpMessageParser {
@@ -202,7 +203,7 @@ private class ConnectionContextImpl : ConnectionContext() {
     var requestTarget: String? = null
     var httpVersion: String? = null
 
-    var parsedHeaders: MutableMap<String, MutableList<String>> = mutableMapOf()
+    var parsedHeaders: MutableMap<String, MutableList<String>> = TreeMap(CASE_INSENSITIVE_ORDER)
 
     var bodyType: BodyType? = null
     var remainingContentLength = 0

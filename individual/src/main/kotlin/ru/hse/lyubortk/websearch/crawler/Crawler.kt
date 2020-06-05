@@ -2,23 +2,13 @@ package ru.hse.lyubortk.websearch.crawler
 
 import org.jsoup.Jsoup
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.http.HttpClient
 import ru.hse.lyubortk.websearch.util.RandomTreeSet
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.time.Duration
 
-object Crawler {
-    private const val MAX_SET_SIZE = 500
-    private const val TIMEOUT_MILLIS: Long = 10_000
-
+class Crawler(private val httpClient: HttpClient) {
     private val log = LoggerFactory.getLogger(Crawler::class.java)
-
-    private val httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofMillis(TIMEOUT_MILLIS))
-        .followRedirects(HttpClient.Redirect.NORMAL)
-        .build()
 
     fun getPageStream(uri: URI): PageStream = PageStream(uri)
 
@@ -27,7 +17,7 @@ object Crawler {
      * Does not implement the Iterator interface because Iterators are used with collections
      * and no one expects an Iterator to send HTTP requests .
      */
-    class PageStream(startURI: URI) {
+    inner class PageStream(startURI: URI) {
         private val visitedUris: MutableSet<URI> = mutableSetOf()
         private val uriQueue: RandomTreeSet<URI> = RandomTreeSet<URI>().also { it.add(startURI) }
 
@@ -41,13 +31,16 @@ object Crawler {
             uriQueue.remove(uri)
 
             try {
-                val request = HttpRequest.newBuilder().uri(uri).GET().timeout(Duration.ofSeconds(TIMEOUT_MILLIS)).build()
                 log.info("Sending GET to $uri")
-                val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-                val responseUri = response.uri()
+                val response = httpClient.get(uri, Duration.ofMillis(TIMEOUT_MILLIS))
+                val responseUri = response.responseUri()
                 visitedUris.add(uri)
                 visitedUris.add(responseUri)
-                if (!response.headers().allValues("Content-Type").any { it.startsWith("text") }) {
+                val isText = response.headers()
+                    .getOrDefault(CONTENT_TYPE_HEADER, listOf())
+                    .any { it.startsWith("text") }
+
+                if (!isText) {
                     return PageFetchResult.NotTextPage(responseUri)
                 }
 
@@ -63,6 +56,7 @@ object Crawler {
                         try {
                             responseUri.resolve(it)
                         } catch (e: Exception) {
+                            log.info("invalid uri in page $uri")
                             null
                         }
                     }.filterNot { visitedUris.contains(it) }
@@ -86,5 +80,11 @@ object Crawler {
         class TextPage(uri: URI, val name: String, val content: String) : PageFetchResult(uri)
         class NotTextPage(uri: URI) : PageFetchResult(uri)
         class RequestError(uri: URI, val exception: Exception) : PageFetchResult(uri)
+    }
+
+    companion object {
+        private const val MAX_SET_SIZE = 500
+        private const val TIMEOUT_MILLIS: Long = 10_000
+        private const val CONTENT_TYPE_HEADER = "Content-Type"
     }
 }

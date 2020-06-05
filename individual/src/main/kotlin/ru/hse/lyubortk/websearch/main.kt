@@ -3,20 +3,23 @@ package ru.hse.lyubortk.websearch
 import io.javalin.Javalin
 import ru.hse.lyubortk.websearch.api.SearchApi
 import ru.hse.lyubortk.websearch.core.Searcher
-import ru.hse.lyubortk.websearch.http.implementation.HttpServer
+import ru.hse.lyubortk.websearch.crawler.Crawler
 import ru.hse.lyubortk.websearch.http.adapters.JavalinEndpointBinderAdapter
+import ru.hse.lyubortk.websearch.http.adapters.JdkHttpClientAdapter
+import ru.hse.lyubortk.websearch.http.implementation.HttpServer
 import ru.hse.lyubortk.websearch.http.implementation.RequestProcessor
+import java.net.http.HttpClient
+import java.time.Duration
 
 fun printUsage() = println(
     """
     |Usage:
-    |javalin http server and client: ./gradlew run --args='PORT javalin'
-    |custom http server and client: ./gradlew run --args='PORT custom'
+    |./gradlew run --args='PORT (javalin/custom) (jdk/custom)'
 """.trimMargin()
 )
 
 fun main(args: Array<String>) {
-    if (args.size != 2) {
+    if (args.size != 3) {
         printUsage()
         return
     }
@@ -25,12 +28,14 @@ fun main(args: Array<String>) {
         printUsage()
         return
     }
+    val serverParam = args[1].toLowerCase()
+    val clientParam = args[2].toLowerCase()
 
-    val server = when (args[1]) {
+    val server = when (serverParam) {
         "javalin" -> JavalinEndpointBinderAdapter(Javalin.create().start(port))
         "custom" -> {
             val requestProcessor = RequestProcessor()
-            val httpServer = HttpServer(port, requestProcessor)
+            HttpServer(port, requestProcessor)
             requestProcessor
         }
         else -> {
@@ -39,5 +44,24 @@ fun main(args: Array<String>) {
         }
     }
 
-    SearchApi(server, Searcher())
+    val client = when (clientParam) {
+        "jdk" -> {
+            val jdkClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(10_000)) //TODO: fixme
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build()
+            JdkHttpClientAdapter(jdkClient)
+        }
+        "custom" -> {
+            TODO()
+        }
+        else -> {
+            printUsage()
+            return
+        }
+    }
+
+    val crawler = Crawler(client)
+    val searcher = Searcher(crawler)
+    SearchApi(server, searcher)
 }
