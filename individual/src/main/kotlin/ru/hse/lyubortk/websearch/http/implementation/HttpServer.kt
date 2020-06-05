@@ -39,18 +39,18 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
                 when (val parseResult = HttpMessageParser.parseRequests(context, byteArray.take(bytesRead))) {
                     EncodingNotImplemented -> {
                         val response = processor.getNotImplementedResponse()
-                        outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                        outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
                         finished = true
                     }
                     ParseError -> {
                         val response = processor.getBadRequestResponse()
-                        outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                        outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
                         finished = true
                     }
                     is ParsedRequests -> {
                         requests@ for (request in parseResult.requests) {
                             val (response, action) = processor.processRequest(request)
-                            outputStream.write(HttpResponseSerializer.serialize(response).toByteArray())
+                            outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
                             if (action == ConnectionAction.CLOSE) {
                                 finished = true
                                 break@requests
