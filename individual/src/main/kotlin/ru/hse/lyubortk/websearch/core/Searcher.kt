@@ -73,10 +73,12 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
                 StartIndexingResult.Started
             }
             is NotTextPage -> {
+                log.info("Indexing stopped")
                 indexingInProgress.decrementAndGet()
                 StartIndexingResult.Refused("Not a text page")
             }
             is RequestError -> {
+                log.info("Indexing stopped")
                 indexingInProgress.decrementAndGet()
                 StartIndexingResult.Refused(firstPageResult.exception.message)
             }
@@ -101,6 +103,7 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
                     else -> Unit
                 }
             }
+            log.info("Indexing stopped")
             indexingInProgress.decrementAndGet()
         }
     }

@@ -1,12 +1,15 @@
-package ru.hse.lyubortk.websearch.http.implementation
+package ru.hse.lyubortk.websearch.http.implementation.processor
 
-import ru.hse.lyubortk.websearch.http.HttpServerEndpointBinder
+import ru.hse.lyubortk.websearch.http.HttpServer
 import ru.hse.lyubortk.websearch.http.RequestContext
+import ru.hse.lyubortk.websearch.http.implementation.HttpRequest
+import ru.hse.lyubortk.websearch.http.implementation.HttpResponse
+import ru.hse.lyubortk.websearch.http.implementation.connector.ConnectionAction
 import java.net.URI
 import java.net.URLDecoder
 import java.util.concurrent.ConcurrentHashMap
 
-class RequestProcessor : HttpServerEndpointBinder {
+class HttpServerMessageProcessor : HttpServer {
     private val getHandlers: MutableMap<String, (RequestContext) -> Unit> = ConcurrentHashMap()
     private val postHandlers: MutableMap<String, (RequestContext) -> Unit> = ConcurrentHashMap()
 

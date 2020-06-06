@@ -1,16 +1,19 @@
-package ru.hse.lyubortk.websearch.http.implementation
+package ru.hse.lyubortk.websearch.http.implementation.connector
 
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.http.implementation.HttpMessageSerializer
 import ru.hse.lyubortk.websearch.http.implementation.parsing.EncodingNotImplemented
 import ru.hse.lyubortk.websearch.http.implementation.parsing.HttpRequestParser
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ParseError
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ParsedMessages
+import ru.hse.lyubortk.websearch.http.implementation.processor.HttpServerMessageProcessor
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
 
-class HttpServer(port: Int, private val processor: RequestProcessor) {
-    private val log = LoggerFactory.getLogger(HttpServer::class.java)
+class HttpServerConnector(port: Int, private val processor: HttpServerMessageProcessor) : BaseConnector() {
+    override val log: Logger = LoggerFactory.getLogger(HttpServerConnector::class.java)
 
     private val serverSocket = ServerSocket(port)
     private val clientHandlerThreadPool = Executors.newCachedThreadPool()
@@ -76,24 +79,7 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
         }
     }
 
-    private fun closeConnection(socket: Socket) {
-        val inputStream = socket.getInputStream()
-        socket.shutdownOutput()
-
-        val byteArray = ByteArray(BUFFER_SIZE)
-        val startTime = System.currentTimeMillis()
-        var bytesRead = inputStream.read(byteArray)
-        while (bytesRead > 0 && (System.currentTimeMillis() - startTime < HALF_CLOSE_TIMEOUT_MILLIS)) {
-            bytesRead = inputStream.read(byteArray)
-        }
-        if (bytesRead > 0) {
-            log.warn("Connection from ${socket.inetAddress} is closed due to timeout before half-close")
-        }
-        socket.close()
-    }
-
     companion object {
-        private const val HALF_CLOSE_TIMEOUT_MILLIS = 10_000
         private const val BUFFER_SIZE = 512
         private const val SOCKET_READ_TIMEOUT_MILLIS = 25_000
     }

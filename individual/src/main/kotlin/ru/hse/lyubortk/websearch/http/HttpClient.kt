@@ -8,6 +8,7 @@ interface HttpClient {
 }
 
 interface GetResponse {
+    fun statusCode(): Int
     fun responseUri(): URI
     fun headers(): Map<String, List<String>>
     fun body(): String?

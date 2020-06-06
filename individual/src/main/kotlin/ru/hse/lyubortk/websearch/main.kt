@@ -4,11 +4,13 @@ import io.javalin.Javalin
 import ru.hse.lyubortk.websearch.api.SearchApi
 import ru.hse.lyubortk.websearch.core.Searcher
 import ru.hse.lyubortk.websearch.crawler.Crawler
-import ru.hse.lyubortk.websearch.http.adapters.JavalinEndpointBinderAdapter
+import ru.hse.lyubortk.websearch.http.adapters.JavalinHttpServerAdapter
 import ru.hse.lyubortk.websearch.http.adapters.JdkHttpClientAdapter
-import ru.hse.lyubortk.websearch.http.implementation.HttpClientImpl
-import ru.hse.lyubortk.websearch.http.implementation.HttpServer
-import ru.hse.lyubortk.websearch.http.implementation.RequestProcessor
+import ru.hse.lyubortk.websearch.http.implementation.connector.HttpClientConnector
+import ru.hse.lyubortk.websearch.http.implementation.connector.HttpServerConnector
+import ru.hse.lyubortk.websearch.http.implementation.processor.HttpClientMessageProcessor
+import ru.hse.lyubortk.websearch.http.implementation.processor.HttpClientRedirector
+import ru.hse.lyubortk.websearch.http.implementation.processor.HttpServerMessageProcessor
 import java.net.http.HttpClient
 import java.time.Duration
 
@@ -33,10 +35,10 @@ fun main(args: Array<String>) {
     val clientParam = args[2].toLowerCase()
 
     val server = when (serverParam) {
-        "javalin" -> JavalinEndpointBinderAdapter(Javalin.create().start(port))
+        "javalin" -> JavalinHttpServerAdapter(Javalin.create().start(port))
         "custom" -> {
-            val requestProcessor = RequestProcessor()
-            HttpServer(port, requestProcessor)
+            val requestProcessor = HttpServerMessageProcessor()
+            HttpServerConnector(port, requestProcessor)
             requestProcessor
         }
         else -> {
@@ -54,7 +56,8 @@ fun main(args: Array<String>) {
             JdkHttpClientAdapter(jdkClient)
         }
         "custom" -> {
-            HttpClientImpl(Duration.ofMillis(10_000))
+            val connector = HttpClientConnector(Duration.ofMillis(10_000))
+            HttpClientRedirector(HttpClientMessageProcessor(connector))
         }
         else -> {
             printUsage()

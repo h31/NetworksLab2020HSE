@@ -6,11 +6,11 @@ import ru.hse.lyubortk.websearch.api.html.ResultPage
 import ru.hse.lyubortk.websearch.core.Searcher
 import ru.hse.lyubortk.websearch.core.Searcher.Companion.StartIndexingResult.Refused
 import ru.hse.lyubortk.websearch.core.Searcher.Companion.StartIndexingResult.Started
-import ru.hse.lyubortk.websearch.http.HttpServerEndpointBinder
+import ru.hse.lyubortk.websearch.http.HttpServer
 import ru.hse.lyubortk.websearch.http.RequestContext
 import java.net.URL
 
-class SearchApi(server: HttpServerEndpointBinder, searcher: Searcher) {
+class SearchApi(server: HttpServer, searcher: Searcher) {
     private val log = LoggerFactory.getLogger(SearchApi::class.java)
 
     init {
