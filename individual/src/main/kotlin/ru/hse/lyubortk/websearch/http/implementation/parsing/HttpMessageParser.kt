@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.parsing
 
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ConnectionContext.Companion.Body.ChuckedEncodingBody
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ConnectionContext.Companion.Body.ContentLengthBody
+import java.lang.NumberFormatException
 import java.lang.String.CASE_INSENSITIVE_ORDER
 import java.util.*
 
@@ -44,27 +45,71 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
     }
 
     private fun parseBody(context: U): ParseResult<T>? {
-        when (val body = context.body) {
+        return when (val body = context.body) {
             null -> {
                 val request = createMessage(context) ?: return ParseError
                 context.reset()
-                return ParsedMessages(listOf(request))
+                ParsedMessages(listOf(request))
             }
-            is ContentLengthBody -> {
-                val readBytes = context.unparsedBytes.take(body.remainingContentLength)
-                for (i in readBytes.indices) {
-                    context.unparsedBytes.poll()
+            is ContentLengthBody -> parseContentLengthBody(body, context)
+            is ChuckedEncodingBody -> parseChunkedEncodingBody(body, context)
+        }
+    }
+
+    private fun parseContentLengthBody(body: ContentLengthBody, context: U): ParseResult<T>? {
+        val readBytes = context.unparsedBytes.take(body.remainingContentLength)
+        for (i in readBytes.indices) {
+            context.unparsedBytes.poll()
+        }
+        body.remainingContentLength -= readBytes.size
+        body.bytes.addAll(readBytes)
+        if (body.remainingContentLength == 0) {
+            val message = createMessage(context) ?: return ParseError
+            context.reset()
+            return ParsedMessages(listOf(message))
+        }
+        context.parsedEverythingPossible = true
+        return null
+    }
+
+    private fun parseChunkedEncodingBody(body: ChuckedEncodingBody, context: U): ParseResult<T>? {
+        when (body.chunkSize) {
+            null -> {
+                val nextLineBytes = context.unparsedBytes.pollFirstLine()
+                if (nextLineBytes == null) {
+                    context.parsedEverythingPossible = true
+                    return null
                 }
-                body.remainingContentLength -= readBytes.size
-                body.bytes.addAll(readBytes)
-                if (body.remainingContentLength == 0) {
-                    val request = createMessage(context) ?: return ParseError
+                try {
+                    body.chunkSize = Integer.parseInt(String(nextLineBytes.toByteArray()), 16)
+                } catch(e: NumberFormatException) {
+                    return ParseError
+                }
+            }
+            0 -> { // skip trailers and read empty line
+                val nextLineBytes = context.unparsedBytes.pollFirstLine()
+                if (nextLineBytes == null) {
+                    context.parsedEverythingPossible = true
+                    return null
+                }
+                if (nextLineBytes.isEmpty()) {
+                    val message = createMessage(context) ?: return ParseError
                     context.reset()
-                    return ParsedMessages(listOf(request))
+                    return ParsedMessages(listOf(message))
                 }
-                context.parsedEverythingPossible = true
             }
-            is ChuckedEncodingBody -> TODO()
+            else -> {
+                val nextLineBytes = context.unparsedBytes.pollFirstLine()
+                if (nextLineBytes == null) {
+                    context.parsedEverythingPossible = true
+                    return null
+                }
+                if (nextLineBytes.size != body.chunkSize) {
+                    return ParseError
+                }
+                body.chunkSize = null
+                context.body?.bytes?.addAll(nextLineBytes)
+            }
         }
         return null
     }
@@ -115,7 +160,7 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
         if (!headerValue.equals(CHUNKED_TRANSFER_ENCODING, true)) {
             return EncodingNotImplemented
         }
-        context.body = ChuckedEncodingBody(mutableListOf())
+        context.body = ChuckedEncodingBody(mutableListOf(), null)
         return null
     }
 
@@ -163,7 +208,7 @@ abstract class ConnectionContext {
 
         sealed class Body(var bytes: MutableList<Byte>) {
             class ContentLengthBody(var remainingContentLength: Int, bytes: MutableList<Byte>) : Body(bytes)
-            class ChuckedEncodingBody(bytes: MutableList<Byte>) : Body(bytes)
+            class ChuckedEncodingBody(bytes: MutableList<Byte>, var chunkSize: Int?) : Body(bytes)
         }
     }
 }
