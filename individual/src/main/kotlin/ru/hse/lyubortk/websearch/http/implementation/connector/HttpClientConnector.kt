@@ -87,6 +87,6 @@ class HttpClientConnector(private val config: ClientConnectorConfig) : BaseConne
     companion object {
         private const val UNSUPPORTED_ENCODING_MESSAGE = "Host replied with message in unsupported encoding"
         private const val PARSE_ERROR_MESSAGE = "Cannot parse http response"
-        private const val BUFFER_SIZE = 1024
+        private const val BUFFER_SIZE = 32768
     }
 }
