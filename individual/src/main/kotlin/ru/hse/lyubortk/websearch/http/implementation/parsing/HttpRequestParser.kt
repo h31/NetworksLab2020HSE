@@ -7,11 +7,7 @@ object HttpRequestParser : HttpMessageParser<HttpRequest, RequestConnectionConte
     override fun createConnectionContext(): RequestConnectionContext = RequestConnectionContext()
 
     override fun parseStartLine(context: RequestConnectionContext): ParseResult<Nothing>? {
-        val nextLineBytes = context.unparsedBytes.pollFirstLine()
-        if (nextLineBytes == null) {
-            context.parsedEverythingPossible = true
-            return null
-        }
+        val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
         val nextLineString = String(nextLineBytes.toByteArray())
         val requestLine = nextLineString.split(SPACE_CHAR, limit = 3)
         if (requestLine.size != 3) {

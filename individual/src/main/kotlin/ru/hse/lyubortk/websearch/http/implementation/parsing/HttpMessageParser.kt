@@ -68,30 +68,21 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
             context.reset()
             return ParsedMessages(listOf(message))
         }
-        context.parsedEverythingPossible = true
-        return null
+        return needMoreBytes(context)
     }
 
     private fun parseChunkedEncodingBody(body: ChuckedEncodingBody, context: U): ParseResult<T>? {
         when (body.chunkSize) {
             null -> {
-                val nextLineBytes = context.unparsedBytes.pollFirstLine()
-                if (nextLineBytes == null) {
-                    context.parsedEverythingPossible = true
-                    return null
-                }
+                val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
                 try {
                     body.chunkSize = Integer.parseInt(String(nextLineBytes.toByteArray()), 16)
                 } catch(e: NumberFormatException) {
                     return ParseError
                 }
             }
-            0 -> { // skip trailers and read empty line
-                val nextLineBytes = context.unparsedBytes.pollFirstLine()
-                if (nextLineBytes == null) {
-                    context.parsedEverythingPossible = true
-                    return null
-                }
+            0 -> { // skip trailers (it is fine according to RFC) and read empty line
+                val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
                 if (nextLineBytes.isEmpty()) {
                     val message = createMessage(context) ?: return ParseError
                     context.reset()
@@ -99,11 +90,7 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
                 }
             }
             else -> {
-                val nextLineBytes = context.unparsedBytes.pollFirstLine()
-                if (nextLineBytes == null) {
-                    context.parsedEverythingPossible = true
-                    return null
-                }
+                val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
                 if (nextLineBytes.size != body.chunkSize) {
                     return ParseError
                 }
@@ -116,12 +103,8 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
 
     protected abstract fun parseStartLine(context: U): ParseResult<Nothing>?
 
-    private fun parseHeaders(context: ConnectionContext): ParseResult<Nothing>? {
-        val nextLineBytes = context.unparsedBytes.pollFirstLine()
-        if (nextLineBytes == null) {
-            context.parsedEverythingPossible = true
-            return null
-        }
+    private fun parseHeaders(context: U): ParseResult<Nothing>? {
+        val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
         val nextLineString = String(nextLineBytes.toByteArray())
         if (nextLineString.isEmpty()) {
             context.state = ConnectionContext.Companion.State.BODY
@@ -177,6 +160,11 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
         }
         val length = headerValue.toIntOrNull() ?: return ParseError
         context.body = ContentLengthBody(length, mutableListOf())
+        return null
+    }
+
+    protected fun needMoreBytes(context: U): Nothing? {
+        context.parsedEverythingPossible = true
         return null
     }
 
