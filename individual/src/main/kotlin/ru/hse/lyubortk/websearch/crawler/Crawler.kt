@@ -3,14 +3,12 @@ package ru.hse.lyubortk.websearch.crawler
 import org.eclipse.jetty.util.URIUtil
 import org.jsoup.Jsoup
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.config.CrawlerConfig
 import ru.hse.lyubortk.websearch.http.HttpClient
 import ru.hse.lyubortk.websearch.util.RandomTreeSet
 import java.net.URI
-import java.net.URL
-import java.net.URLEncoder
-import java.time.Duration
 
-class Crawler(private val httpClient: HttpClient) {
+class Crawler(private val httpClient: HttpClient, private val config: CrawlerConfig) {
     private val log = LoggerFactory.getLogger(Crawler::class.java)
 
     fun getPageStream(uri: URI): PageStream = PageStream(uri)
@@ -35,7 +33,7 @@ class Crawler(private val httpClient: HttpClient) {
 
             try {
                 log.info("Sending GET to $uri")
-                val response = httpClient.get(uri, Duration.ofMillis(TIMEOUT_MILLIS))
+                val response = httpClient.get(uri, config.requestTimeout)
                 val responseUri = response.responseUri()
                 visitedUris.add(uri)
                 visitedUris.add(responseUri)
@@ -69,7 +67,7 @@ class Crawler(private val httpClient: HttpClient) {
                     .shuffled()
                     .forEach { uriQueue.add(it) }
 
-                while (uriQueue.size() > MAX_SET_SIZE) {
+                while (uriQueue.size() > config.maxUriSetSize) {
                     uriQueue.remove(uriQueue.getRandom())
                 }
 
@@ -88,8 +86,6 @@ class Crawler(private val httpClient: HttpClient) {
     }
 
     companion object {
-        private const val MAX_SET_SIZE = 500
-        private const val TIMEOUT_MILLIS: Long = 10_000
         private const val CONTENT_TYPE_HEADER = "Content-Type"
     }
 }

@@ -16,8 +16,8 @@ class HttpClientMessageProcessor(private val connector: HttpClientConnector) : H
     override fun get(uri: URI, timeout: Duration): GetResponse {
         try {
             val scheme = when (uri.scheme.toLowerCase()) {
-                "http" -> Scheme.HTTP
-                "https" -> Scheme.HTTPS
+                Scheme.HTTP.value -> Scheme.HTTP
+                Scheme.HTTPS.value -> Scheme.HTTPS
                 else -> throw UnknownSchemeException("Unknown scheme ${uri.scheme}")
             }
             val host = uri.host
@@ -63,17 +63,9 @@ class HttpClientMessageProcessor(private val connector: HttpClientConnector) : H
     }
 
     companion object {
-        private const val GET = "GET"
-        private const val HTTP_VERSION = "HTTP/1.1"
-        private const val HOST_HEADER = "Host"
-        private const val CONNECTION_HEADER = "Connection"
-        private const val USER_AGENT_HEADER = "User-Agent"
-        private const val CONNECTION_CLOSE_VALUE = "close"
-        private const val USER_AGENT_VALUE = "lyubortk-client/1.0"
-
-        enum class Scheme {
-            HTTP,
-            HTTPS
+        enum class Scheme(val value: String) {
+            HTTP("http"),
+            HTTPS("https")
         }
     }
 }

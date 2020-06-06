@@ -114,18 +114,6 @@ class HttpServerMessageProcessor : HttpServer {
             }
             .toMap()
 
-        private const val HTTP_VERSION = "HTTP/1.1"
-
-        private const val GET = "GET"
-        private const val POST = "POST"
-        private const val HEAD = "HEAD"
-
-        private const val HOST_HEADER = "Host"
-        private const val CONNECTION_HEADER = "Connection"
-        private const val CONTENT_LENGTH_HEADER = "Content-Length"
-        private const val CONTENT_TYPE_HEADER = "Content-Type"
-        private const val CONNECTION_CLOSE_VALUE = "close"
-
         private fun createBasicResponse(statusCode: Int, reasonPhrase: String) = HttpResponse(
             HTTP_VERSION,
             statusCode,

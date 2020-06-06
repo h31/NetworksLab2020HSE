@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.connector
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.config.ClientConnectorConfig
 import ru.hse.lyubortk.websearch.http.implementation.*
 import ru.hse.lyubortk.websearch.http.implementation.parsing.EncodingNotImplemented
 import ru.hse.lyubortk.websearch.http.implementation.parsing.HttpResponseParser
@@ -12,7 +13,8 @@ import java.net.Socket
 import java.time.Duration
 import javax.net.ssl.SSLSocketFactory
 
-class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector() {
+class HttpClientConnector(private val config: ClientConnectorConfig) : BaseConnector(config.halfCloseTimeout) {
+
     override val log: Logger = LoggerFactory.getLogger(HttpClientConnector::class.java)
 
     fun sendRequest(
@@ -23,7 +25,7 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
     ): HttpResponse {
         var socket = Socket()
         try {
-            socket.connect(inetSocketAddress, connectTimeout.toMillis().toInt())
+            socket.connect(inetSocketAddress, config.connectTimeout.toMillis().toInt())
             if (useTls) {
                 socket = wrapInSslSocket(socket, inetSocketAddress)
             }
@@ -41,11 +43,11 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
                 when (val parseResult = HttpResponseParser.parseMessages(context, inputBuffer.take(bytesRead))) {
                     EncodingNotImplemented -> {
                         finished = true
-                        exception = UnsupportedEncodingException("Host replied with message in unsupported encoding")
+                        exception = UnsupportedEncodingException(UNSUPPORTED_ENCODING_MESSAGE)
                     }
                     ParseError -> {
                         finished = true
-                        exception = ResponseParseErrorException("Cannot parse http response")
+                        exception = ResponseParseErrorException(PARSE_ERROR_MESSAGE)
                     }
                     is ParsedMessages -> {
                         if (parseResult.messages.isNotEmpty()) {
@@ -83,6 +85,8 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
     }
 
     companion object {
-        private const val BUFFER_SIZE = 512
+        private const val UNSUPPORTED_ENCODING_MESSAGE = "Host replied with message in unsupported encoding"
+        private const val PARSE_ERROR_MESSAGE = "Cannot parse http response"
+        private const val BUFFER_SIZE = 1024
     }
 }

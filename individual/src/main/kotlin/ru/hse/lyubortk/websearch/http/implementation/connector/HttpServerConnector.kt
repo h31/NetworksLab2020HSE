@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.connector
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.config.ServerConnectorConfig
 import ru.hse.lyubortk.websearch.http.implementation.HttpMessageSerializer
 import ru.hse.lyubortk.websearch.http.implementation.parsing.EncodingNotImplemented
 import ru.hse.lyubortk.websearch.http.implementation.parsing.HttpRequestParser
@@ -12,7 +13,11 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
 
-class HttpServerConnector(port: Int, private val processor: HttpServerMessageProcessor) : BaseConnector() {
+class HttpServerConnector(
+    port: Int,
+    private val processor: HttpServerMessageProcessor,
+    private val config: ServerConnectorConfig
+) : BaseConnector(config.halfCloseTimeout) {
     override val log: Logger = LoggerFactory.getLogger(HttpServerConnector::class.java)
 
     private val serverSocket = ServerSocket(port)
@@ -35,7 +40,7 @@ class HttpServerConnector(port: Int, private val processor: HttpServerMessagePro
 
     private fun processClient(socket: Socket) {
         try {
-            socket.soTimeout = SOCKET_READ_TIMEOUT_MILLIS
+            socket.soTimeout = config.socketReadTimeout.toMillis().toInt()
             val context = HttpRequestParser.createConnectionContext()
             val inputStream = socket.getInputStream()
             val outputStream = socket.getOutputStream()
@@ -80,8 +85,7 @@ class HttpServerConnector(port: Int, private val processor: HttpServerMessagePro
     }
 
     companion object {
-        private const val BUFFER_SIZE = 512
-        private const val SOCKET_READ_TIMEOUT_MILLIS = 25_000
+        private const val BUFFER_SIZE = 1024
     }
 }
 

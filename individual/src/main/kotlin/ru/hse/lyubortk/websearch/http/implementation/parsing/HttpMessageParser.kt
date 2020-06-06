@@ -2,7 +2,6 @@ package ru.hse.lyubortk.websearch.http.implementation.parsing
 
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ConnectionContext.Companion.Body.ChuckedEncodingBody
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ConnectionContext.Companion.Body.ContentLengthBody
-import java.lang.NumberFormatException
 import java.lang.String.CASE_INSENSITIVE_ORDER
 import java.util.*
 
@@ -57,10 +56,7 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
     }
 
     private fun parseContentLengthBody(body: ContentLengthBody, context: U): ParseResult<T>? {
-        val readBytes = context.unparsedBytes.take(body.remainingContentLength)
-        for (i in readBytes.indices) {
-            context.unparsedBytes.poll()
-        }
+        val readBytes = context.unparsedBytes.pollNBytes(body.remainingContentLength)
         body.remainingContentLength -= readBytes.size
         body.bytes.addAll(readBytes)
         if (body.remainingContentLength == 0) {
@@ -72,12 +68,12 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
     }
 
     private fun parseChunkedEncodingBody(body: ChuckedEncodingBody, context: U): ParseResult<T>? {
-        when (body.chunkSize) {
+        when (val chunkSize = body.chunkSize) {
             null -> {
                 val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
                 try {
                     body.chunkSize = Integer.parseInt(String(nextLineBytes.toByteArray()), 16)
-                } catch(e: NumberFormatException) {
+                } catch (e: NumberFormatException) {
                     return ParseError
                 }
             }
@@ -90,12 +86,16 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
                 }
             }
             else -> {
-                val nextLineBytes = context.unparsedBytes.pollFirstLine() ?: return needMoreBytes(context)
-                if (nextLineBytes.size != body.chunkSize) {
+                if (context.unparsedBytes.size < chunkSize + 2) { // 2 for CRLF
+                    return needMoreBytes(context)
+                }
+                val readBytes = context.unparsedBytes.pollNBytes(chunkSize)
+                val nextLine = context.unparsedBytes.pollFirstLine()
+                if (nextLine == null || nextLine.isNotEmpty()) {
                     return ParseError
                 }
                 body.chunkSize = null
-                context.body?.bytes?.addAll(nextLineBytes)
+                context.body?.bytes?.addAll(readBytes)
             }
         }
         return null
@@ -169,6 +169,10 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
     }
 
     protected abstract fun createMessage(context: U): T?
+
+    companion object {
+        private const val MAX_UNPARSED_BYTES = 10_000_000
+    }
 }
 
 abstract class ConnectionContext {

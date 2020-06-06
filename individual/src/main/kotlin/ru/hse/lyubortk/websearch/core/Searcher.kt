@@ -12,6 +12,7 @@ import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.MMapDirectory
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.config.SearcherConfig
 import ru.hse.lyubortk.websearch.crawler.Crawler
 import ru.hse.lyubortk.websearch.crawler.Crawler.PageFetchResult.*
 import java.net.URI
@@ -19,16 +20,16 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-class Searcher(private val crawler: Crawler) : AutoCloseable {
+class Searcher(private val crawler: Crawler, private val config: SearcherConfig) : AutoCloseable {
     private val log = LoggerFactory.getLogger(Searcher::class.java)
 
-    private val index: Directory = MMapDirectory(Path.of(LUCENE_PATH))
+    private val index: Directory = MMapDirectory(Path.of(config.lucenePath))
     private val analyzer = StandardAnalyzer()
     private val indexWriterConfig = IndexWriterConfig(analyzer)
     private val indexWriter = IndexWriter(index, indexWriterConfig).also { it.commit() }
 
     private val indexingInProgress = AtomicInteger(0)
-    private val indexingThreadPool = Executors.newFixedThreadPool(INDEXING_THREADS)
+    private val indexingThreadPool = Executors.newFixedThreadPool(config.indexingThreads)
 
     fun search(text: String): SearchResult {
         log.info("Searching for \"$text\"")
@@ -43,7 +44,7 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
                 booleanQueryBuilder.add(TermQuery(Term(CONTENT_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
                 booleanQueryBuilder.add(TermQuery(Term(TITLE_FIELD_NAME, it)), BooleanClause.Occur.SHOULD)
             }
-            val luceneSearchResult = indexSearcher.search(booleanQueryBuilder.build(), MAX_RESULTS)
+            val luceneSearchResult = indexSearcher.search(booleanQueryBuilder.build(), config.maxSearchResults)
 
             val totalResults = TotalResults(
                 luceneSearchResult.totalHits.value,
@@ -60,7 +61,7 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
     fun startIndexing(uri: URI): StartIndexingResult {
         log.info("Starting indexing from $uri")
         val newIndexingNumber = indexingInProgress.incrementAndGet()
-        if (newIndexingNumber > MAX_INDEXING_PROCESSES) {
+        if (newIndexingNumber > config.maxIndexingProcesses) {
             indexingInProgress.decrementAndGet()
             return StartIndexingResult.Refused(TO_MANY_INDEXING_PROCESSES_REASON)
         }
@@ -95,7 +96,7 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
     private fun startIndexingProcess(pageStream: Crawler.PageStream) {
         indexingThreadPool.submit {
             var visitedPages = 0
-            while (visitedPages < MAX_VISITED_PAGES_PER_INDEXING && pageStream.hasNext()) {
+            while (visitedPages < config.maxVisitedPagesPerProcess && pageStream.hasNext()) {
                 val pageResult = pageStream.next()
                 visitedPages++
                 when (pageResult) {
@@ -129,12 +130,7 @@ class Searcher(private val crawler: Crawler) : AutoCloseable {
         const val URI_FIELD_NAME = "uri"
         const val TITLE_FIELD_NAME = "title"
         const val CONTENT_FIELD_NAME = "content"
-        const val LUCENE_PATH = "./lucene"
-        const val MAX_RESULTS = 10
-        const val INDEXING_THREADS = 5
-        const val MAX_INDEXING_PROCESSES = 5
         const val TO_MANY_INDEXING_PROCESSES_REASON = "Too many indexing processes"
-        const val MAX_VISITED_PAGES_PER_INDEXING = 5000
 
         data class SearchResult(
             val searchQuery: String,

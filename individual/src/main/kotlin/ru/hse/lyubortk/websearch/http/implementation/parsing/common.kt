@@ -5,7 +5,6 @@ import java.util.*
 const val TRANSFER_ENCODING_HEADER = "Transfer-Encoding"
 const val CONTENT_LENGTH_HEADER = "Content-Length"
 const val CHUNKED_TRANSFER_ENCODING = "chunked"
-const val MAX_UNPARSED_BYTES = 10_000
 
 const val CR: Byte = '\r'.toByte()
 const val LF: Byte = '\n'.toByte()
@@ -32,4 +31,12 @@ fun ArrayDeque<Byte>.pollFirstLine(): List<Byte>? {
         return null
     }
     return List(lastIndex + 2) { this.pollFirst() }.dropLast(2)
+}
+
+fun ArrayDeque<Byte>.pollNBytes(n: Int): List<Byte> {
+    val result = this.take(n)
+    for (i in result.indices) {
+        this.poll()
+    }
+    return result
 }

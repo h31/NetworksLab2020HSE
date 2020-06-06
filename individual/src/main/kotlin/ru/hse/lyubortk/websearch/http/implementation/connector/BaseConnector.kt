@@ -2,8 +2,9 @@ package ru.hse.lyubortk.websearch.http.implementation.connector
 
 import org.slf4j.Logger
 import java.net.Socket
+import java.time.Duration
 
-abstract class BaseConnector {
+abstract class BaseConnector(private val halfCloseTimeout: Duration) {
     abstract val log: Logger
 
     protected fun closeConnection(socket: Socket) {
@@ -13,7 +14,7 @@ abstract class BaseConnector {
         val byteArray = ByteArray(BUFFER_SIZE)
         val startTime = System.currentTimeMillis()
         var bytesRead = inputStream.read(byteArray)
-        while (bytesRead > 0 && (System.currentTimeMillis() - startTime < HALF_CLOSE_TIMEOUT_MILLIS)) {
+        while (bytesRead > 0 && (System.currentTimeMillis() - startTime < halfCloseTimeout.toMillis())) {
             bytesRead = inputStream.read(byteArray)
         }
         if (bytesRead > 0) {
@@ -23,7 +24,6 @@ abstract class BaseConnector {
     }
 
     companion object {
-        private const val HALF_CLOSE_TIMEOUT_MILLIS = 10_000
-        private const val BUFFER_SIZE = 512
+        private const val BUFFER_SIZE = 1024
     }
 }

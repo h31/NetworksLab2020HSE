@@ -1,7 +1,10 @@
 package ru.hse.lyubortk.websearch
 
+import com.typesafe.config.ConfigFactory
+import io.github.config4k.extract
 import io.javalin.Javalin
 import ru.hse.lyubortk.websearch.api.SearchApi
+import ru.hse.lyubortk.websearch.config.*
 import ru.hse.lyubortk.websearch.core.Searcher
 import ru.hse.lyubortk.websearch.crawler.Crawler
 import ru.hse.lyubortk.websearch.http.adapters.JavalinHttpServerAdapter
@@ -12,9 +15,8 @@ import ru.hse.lyubortk.websearch.http.implementation.processor.HttpClientMessage
 import ru.hse.lyubortk.websearch.http.implementation.processor.HttpClientRedirector
 import ru.hse.lyubortk.websearch.http.implementation.processor.HttpServerMessageProcessor
 import java.net.http.HttpClient
-import java.time.Duration
 
-fun printUsage() = println(
+private fun printUsage() = println(
     """
     |Usage:
     |./gradlew run --args='PORT (javalin/custom) (jdk/custom)'
@@ -34,11 +36,18 @@ fun main(args: Array<String>) {
     val serverParam = args[1].toLowerCase()
     val clientParam = args[2].toLowerCase()
 
+    val config = ConfigFactory.parseResources("application.conf")
+    val searcherConfig = config.extract<SearcherConfig>("searcher")
+    val serverConnectorConfig = config.extract<ServerConnectorConfig>("server-connector")
+    val crawlerConfig = config.extract<CrawlerConfig>("crawler")
+    val redirectorConfig = config.extract<RedirectorConfig>("redirector")
+    val clientConnectorConfig = config.extract<ClientConnectorConfig>("client-connector")
+
     val server = when (serverParam) {
         "javalin" -> JavalinHttpServerAdapter(Javalin.create().start(port))
         "custom" -> {
             val requestProcessor = HttpServerMessageProcessor()
-            HttpServerConnector(port, requestProcessor)
+            HttpServerConnector(port, requestProcessor, serverConnectorConfig)
             requestProcessor
         }
         else -> {
@@ -50,14 +59,15 @@ fun main(args: Array<String>) {
     val client = when (clientParam) {
         "jdk" -> {
             val jdkClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(10_000)) //TODO: fixme
+                .connectTimeout(clientConnectorConfig.connectTimeout)
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build()
             JdkHttpClientAdapter(jdkClient)
         }
         "custom" -> {
-            val connector = HttpClientConnector(Duration.ofMillis(10_000))
-            HttpClientRedirector(HttpClientMessageProcessor(connector))
+            val connector = HttpClientConnector(clientConnectorConfig)
+            val messageProcessor = HttpClientMessageProcessor(connector)
+            HttpClientRedirector(messageProcessor, redirectorConfig)
         }
         else -> {
             printUsage()
@@ -65,7 +75,7 @@ fun main(args: Array<String>) {
         }
     }
 
-    val crawler = Crawler(client)
-    val searcher = Searcher(crawler)
+    val crawler = Crawler(client, crawlerConfig)
+    val searcher = Searcher(crawler, searcherConfig)
     SearchApi(server, searcher)
 }
