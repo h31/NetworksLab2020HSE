@@ -2,9 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.connector
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import ru.hse.lyubortk.websearch.http.implementation.HttpMessageSerializer
-import ru.hse.lyubortk.websearch.http.implementation.HttpRequest
-import ru.hse.lyubortk.websearch.http.implementation.HttpResponse
+import ru.hse.lyubortk.websearch.http.implementation.*
 import ru.hse.lyubortk.websearch.http.implementation.parsing.EncodingNotImplemented
 import ru.hse.lyubortk.websearch.http.implementation.parsing.HttpResponseParser
 import ru.hse.lyubortk.websearch.http.implementation.parsing.ParseError
@@ -38,13 +36,16 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
             var finished = false
             val context = HttpResponseParser.createConnectionContext()
             var response: HttpResponse? = null
+            var exception: Exception? = null
             while (!finished && bytesRead > 0) {
                 when (val parseResult = HttpResponseParser.parseMessages(context, inputBuffer.take(bytesRead))) {
                     EncodingNotImplemented -> {
                         finished = true
+                        exception = UnsupportedEncodingException("Host replied with message in unsupported encoding")
                     }
                     ParseError -> {
                         finished = true
+                        exception = ResponseParseErrorException("Cannot parse http response")
                     }
                     is ParsedMessages -> {
                         if (parseResult.messages.isNotEmpty()) {
@@ -58,12 +59,15 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
                 }
             }
 
-            if (response == null) {
-                throw RuntimeException("FAIL") // TODO: fixme
-            }
             closeConnection(socket)
-            return response
+            if (exception != null) {
+                throw exception
+            }
+            return response!!
         } catch (e: Exception) {
+            if (!socket.isClosed) {
+                socket.close()
+            }
             log.error("Exception in http client connector", e)
             throw e
         }

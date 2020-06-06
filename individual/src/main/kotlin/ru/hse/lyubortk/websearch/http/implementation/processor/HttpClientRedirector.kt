@@ -2,7 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.processor
 
 import ru.hse.lyubortk.websearch.http.GetResponse
 import ru.hse.lyubortk.websearch.http.HttpClient
-import java.lang.RuntimeException
+import ru.hse.lyubortk.websearch.http.implementation.NoLocationHeaderException
 import java.net.URI
 import java.time.Duration
 
@@ -15,7 +15,10 @@ class HttpClientRedirector(private val inner: HttpClient) : HttpClient {
             if (lastResponse.statusCode() !in 300..399) {
                 break
             }
-            val location = lastResponse.headers()[LOCATION_HEADER]?.first() ?: throw RuntimeException("kek")
+            val location =
+                lastResponse.headers()[LOCATION_HEADER]?.first() ?: throw NoLocationHeaderException(
+                    "Location header was not present in response with code ${lastResponse.statusCode()}"
+                )
             lastUri = lastUri.resolve(location)
         }
         return lastResponse

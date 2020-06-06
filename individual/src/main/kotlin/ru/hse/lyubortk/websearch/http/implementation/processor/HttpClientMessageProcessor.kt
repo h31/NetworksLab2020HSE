@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 import ru.hse.lyubortk.websearch.http.GetResponse
 import ru.hse.lyubortk.websearch.http.HttpClient
 import ru.hse.lyubortk.websearch.http.implementation.HttpRequest
+import ru.hse.lyubortk.websearch.http.implementation.UnknownSchemeException
 import ru.hse.lyubortk.websearch.http.implementation.connector.HttpClientConnector
 import java.net.InetSocketAddress
 import java.net.URI
@@ -17,7 +18,7 @@ class HttpClientMessageProcessor(private val connector: HttpClientConnector) : H
             val scheme = when (uri.scheme.toLowerCase()) {
                 "http" -> Scheme.HTTP
                 "https" -> Scheme.HTTPS
-                else -> throw RuntimeException("unknow scheme")
+                else -> throw UnknownSchemeException("Unknown scheme ${uri.scheme}")
             }
             val host = uri.host
             val port = uri.port.let {
