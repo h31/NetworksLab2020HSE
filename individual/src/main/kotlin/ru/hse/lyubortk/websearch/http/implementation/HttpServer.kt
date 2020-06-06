@@ -1,6 +1,10 @@
 package ru.hse.lyubortk.websearch.http.implementation
 
 import org.slf4j.LoggerFactory
+import ru.hse.lyubortk.websearch.http.implementation.parsing.EncodingNotImplemented
+import ru.hse.lyubortk.websearch.http.implementation.parsing.HttpRequestParser
+import ru.hse.lyubortk.websearch.http.implementation.parsing.ParseError
+import ru.hse.lyubortk.websearch.http.implementation.parsing.ParsedMessages
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
@@ -29,14 +33,14 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
     private fun processClient(socket: Socket) {
         try {
             socket.soTimeout = SOCKET_READ_TIMEOUT_MILLIS
-            val context = HttpMessageParser.createConnectionContext()
+            val context = HttpRequestParser.createConnectionContext()
             val inputStream = socket.getInputStream()
             val outputStream = socket.getOutputStream()
             val byteArray = ByteArray(BUFFER_SIZE)
             var bytesRead = inputStream.read(byteArray)
             var finished = false
             while (bytesRead > 0 && !finished) {
-                when (val parseResult = HttpMessageParser.parseRequests(context, byteArray.take(bytesRead))) {
+                when (val parseResult = HttpRequestParser.parseMessages(context, byteArray.take(bytesRead))) {
                     EncodingNotImplemented -> {
                         val response = processor.getNotImplementedResponse()
                         outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
@@ -47,8 +51,8 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
                         outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
                         finished = true
                     }
-                    is ParsedRequests -> {
-                        requests@ for (request in parseResult.requests) {
+                    is ParsedMessages -> {
+                        requests@ for (request in parseResult.messages) {
                             val (response, action) = processor.processRequest(request)
                             outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
                             if (action == ConnectionAction.CLOSE) {
