@@ -12,6 +12,7 @@ import ru.hse.lyubortk.websearch.http.implementation.parsing.ParsedMessages
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.time.Duration
+import javax.net.ssl.SSLSocketFactory
 
 class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector() {
     override val log: Logger = LoggerFactory.getLogger(HttpClientConnector::class.java)
@@ -22,9 +23,12 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
         timeout: Duration,
         useTls: Boolean
     ): HttpResponse {
-        val socket = Socket()
+        var socket = Socket()
         try {
             socket.connect(inetSocketAddress, connectTimeout.toMillis().toInt())
+            if (useTls) {
+                socket = wrapInSslSocket(socket, inetSocketAddress)
+            }
             socket.soTimeout = timeout.toMillis().toInt()
             socket.getOutputStream().write(HttpMessageSerializer.serialize(request).toByteArray())
 
@@ -55,7 +59,7 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
             }
 
             if (response == null) {
-                throw RuntimeException("FAIL")
+                throw RuntimeException("FAIL") // TODO: fixme
             }
             closeConnection(socket)
             return response
@@ -63,6 +67,15 @@ class HttpClientConnector(private val connectTimeout: Duration) : BaseConnector(
             log.error("Exception in http client connector", e)
             throw e
         }
+    }
+
+    private fun wrapInSslSocket(socket: Socket, inetSocketAddress: InetSocketAddress): Socket {
+        return (SSLSocketFactory.getDefault() as SSLSocketFactory).createSocket(
+            socket,
+            inetSocketAddress.hostName,
+            inetSocketAddress.port,
+            true
+        )
     }
 
     companion object {
