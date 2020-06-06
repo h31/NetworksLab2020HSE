@@ -11,6 +11,7 @@ import ru.hse.lyubortk.websearch.http.implementation.parsing.ParsedMessages
 import ru.hse.lyubortk.websearch.http.implementation.processor.HttpServerMessageProcessor
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.util.concurrent.Executors
 
 class HttpServerConnector(
@@ -76,7 +77,12 @@ class HttpServerConnector(
             }
             closeConnection(socket)
         } catch (e: Exception) {
-            log.error("Exception while processing client ${socket.inetAddress}", e)
+            val chromeMessage = if (e is SocketTimeoutException) {
+                " (It is OK if you are using Chromium: it creates multiple connections in advance and does not use them)"
+            } else {
+                ""
+            }
+            log.error("Exception while processing client ${socket.inetAddress} $chromeMessage", e)
             if (!socket.isClosed) {
                 socket.close()
             }
