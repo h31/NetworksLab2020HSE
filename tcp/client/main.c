@@ -31,9 +31,10 @@ void *reader(void *sct) {
     int socket = *(int *) sct;
 
     message msg;
-    char buffer[BUFFER_SIZE];
+    IncompliteBuffer iBuffer;
     while (1) {
-        int n = read_bytes(socket, buffer);
+        clear_buffer(&iBuffer);
+        int n = read_bytes(socket, &iBuffer);
 
         if (n < 0) {
             perror("ERROR reading from socket");
@@ -44,7 +45,7 @@ void *reader(void *sct) {
             end_of_connection(socket, 0);
             return (void *)0;
         }
-        deserialize_msg(&msg, buffer, n);
+        deserialize_msg_from_iBuffer(&msg, &iBuffer);
         struct tm *timeinfo = localtime(&msg.tm);
         printf("<%i:%i> [%s] %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg.name, msg.text);
     }
@@ -134,11 +135,11 @@ int main(int argc, char *argv[]) {
 
         time ( &msg.tm );
         
-        char buffer[BUFFER_SIZE];
-        bzero(buffer, BUFFER_SIZE);
-        uint32_t len = serialize_msg(&msg, buffer);
+        IncompliteBuffer iBuffer;
+        clear_buffer(&iBuffer);
+        serialize_msg_to_iBuffer(&msg, &iBuffer);
 
-        code_of_connection = send_bytes(sockfd, buffer, len);
+        code_of_connection = send_bytes(sockfd, &iBuffer);
 
         if (code_of_connection < 0) {
             perror("ERROR writing to socket");

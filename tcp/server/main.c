@@ -39,28 +39,30 @@ void add(ConnectionsSet *set, int new_socket) {
 void *sending(void* conn_set) {
     ConnectionsSet *connections = (ConnectionsSet *) conn_set;
     while (1) {
-        message *msg = NULL;
+        message *msg_ptr = NULL;
         int nread = 0;
-        nread = read(pipe_fd[0], &msg, sizeof(message*));
+        nread = read(pipe_fd[0], &msg_ptr, sizeof(message*));
         if (nread == -1) {
             continue;
         }
-        if (msg == NULL) {
+        if (msg_ptr == NULL) {
             break;
         }
-        char buffer[BUFFER_SIZE];
-        uint32_t msg_len = serialize_msg(msg, buffer);
+        
+        IncompliteBuffer iBuffer;
+        clear_buffer(&iBuffer);
+        serialize_msg_to_iBuffer(msg_ptr, &iBuffer);
 
         pthread_mutex_lock(&connections->lock);
         int empty_i = -1;
 
-        struct tm *timeinfo = localtime(&msg->tm);
-        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg->name, msg->text);
+        struct tm *timeinfo = localtime(&msg_ptr->tm);
+        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
         fflush(stdout);
         
         uint32_t len = connections->size;
         for (uint32_t i = 0; i < len; i++) {
-            if (send_bytes(connections->sockets[i], buffer, msg_len) > 0) {
+            if (send_bytes(connections->sockets[i], &iBuffer) > 0) {
                 if (empty_i != -1) {
                     connections->sockets[empty_i++] = connections->sockets[i];
                 } 
@@ -72,7 +74,7 @@ void *sending(void* conn_set) {
             }
         }
         pthread_mutex_unlock(&connections->lock);
-        free(msg);
+        free(msg_ptr);
     }
     return NULL;
 }
@@ -84,12 +86,13 @@ void *connection_handler(void *sct) {
 
     printf("new connection!\n");
     fflush(stdout);
-    char buffer[BUFFER_SIZE];
+    IncompliteBuffer iBuffer;
 
     while(1) {
 
-        message *msg = (message *) calloc(1, sizeof(message));
-        n = read_bytes(socket, buffer);
+        message *msg_ptr = (message *) calloc(1, sizeof(message));
+        clear_buffer(&iBuffer);
+        n = read_bytes(socket, &iBuffer);
 
         if (n == 0) {
             printf("End of connection\n");
@@ -102,8 +105,8 @@ void *connection_handler(void *sct) {
             exit(1);
         }
 
-        deserialize_msg(msg, buffer, n);
-        write(pipe_fd[1], &msg, sizeof(message *));
+        deserialize_msg_from_iBuffer(msg_ptr, &iBuffer);
+        write(pipe_fd[1], &msg_ptr, sizeof(message *));
         
         if (n < 0) {
             perror("ERROR writing to socket");
