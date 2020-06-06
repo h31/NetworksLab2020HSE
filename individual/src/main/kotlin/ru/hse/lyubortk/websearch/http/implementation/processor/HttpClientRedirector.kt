@@ -2,6 +2,7 @@ package ru.hse.lyubortk.websearch.http.implementation.processor
 
 import ru.hse.lyubortk.websearch.http.GetResponse
 import ru.hse.lyubortk.websearch.http.HttpClient
+import java.lang.RuntimeException
 import java.net.URI
 import java.time.Duration
 
@@ -14,12 +15,14 @@ class HttpClientRedirector(private val inner: HttpClient) : HttpClient {
             if (lastResponse.statusCode() !in 300..399) {
                 break
             }
-            lastUri = lastUri.resolve(lastResponse.responseUri())
+            val location = lastResponse.headers()[LOCATION_HEADER]?.first() ?: throw RuntimeException("kek")
+            lastUri = lastUri.resolve(location)
         }
         return lastResponse
     }
 
     companion object {
-        const val MAX_REDIRECTS = 5
+        private const val LOCATION_HEADER = "Location"
+        private const val MAX_REDIRECTS = 5
     }
 }

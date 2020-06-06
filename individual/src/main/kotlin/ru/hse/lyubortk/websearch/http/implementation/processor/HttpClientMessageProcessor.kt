@@ -36,7 +36,8 @@ class HttpClientMessageProcessor(private val connector: HttpClientConnector) : H
                 HTTP_VERSION,
                 mapOf(
                     HOST_HEADER to listOf(host),
-                    CONNECTION_HEADER to listOf(CONNECTION_CLOSE_VALUE)
+                    CONNECTION_HEADER to listOf(CONNECTION_CLOSE_VALUE),
+                    USER_AGENT_HEADER to listOf(USER_AGENT_VALUE)
                 ),
                 null
             )
@@ -65,7 +66,9 @@ class HttpClientMessageProcessor(private val connector: HttpClientConnector) : H
         private const val HTTP_VERSION = "HTTP/1.1"
         private const val HOST_HEADER = "Host"
         private const val CONNECTION_HEADER = "Connection"
+        private const val USER_AGENT_HEADER = "User-Agent"
         private const val CONNECTION_CLOSE_VALUE = "close"
+        private const val USER_AGENT_VALUE = "lyubortk-client/1.0"
 
         enum class Scheme {
             HTTP,

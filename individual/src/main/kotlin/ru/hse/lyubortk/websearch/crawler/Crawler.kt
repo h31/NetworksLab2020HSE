@@ -1,10 +1,13 @@
 package ru.hse.lyubortk.websearch.crawler
 
+import org.eclipse.jetty.util.URIUtil
 import org.jsoup.Jsoup
 import org.slf4j.LoggerFactory
 import ru.hse.lyubortk.websearch.http.HttpClient
 import ru.hse.lyubortk.websearch.util.RandomTreeSet
 import java.net.URI
+import java.net.URL
+import java.net.URLEncoder
 import java.time.Duration
 
 class Crawler(private val httpClient: HttpClient) {
@@ -52,14 +55,16 @@ class Crawler(private val httpClient: HttpClient) {
                     .asSequence()
                     .mapNotNull { it.attr("href") }
                     .filterNot { it.startsWith("#") }
+                    .map { URIUtil.encodePath(it) }
                     .mapNotNull {
                         try {
                             responseUri.resolve(it)
                         } catch (e: Exception) {
-                            log.info("invalid uri in page $uri")
+                            log.info("invalid uri $it in page $uri", e)
                             null
                         }
-                    }.filterNot { visitedUris.contains(it) }
+                    }
+                    .filterNot { visitedUris.contains(it) }
                     .toList()
                     .shuffled()
                     .forEach { uriQueue.add(it) }
@@ -70,7 +75,7 @@ class Crawler(private val httpClient: HttpClient) {
 
                 return PageFetchResult.TextPage(responseUri, title, document.text())
             } catch (e: Exception) {
-                log.error("Exception while trying to get page from $uri")
+                log.error("Exception while trying to get page from $uri", e)
                 return PageFetchResult.RequestError(uri, e)
             }
         }

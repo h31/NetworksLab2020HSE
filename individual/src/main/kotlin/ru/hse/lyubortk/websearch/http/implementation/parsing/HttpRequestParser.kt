@@ -13,7 +13,7 @@ object HttpRequestParser : HttpMessageParser<HttpRequest, RequestConnectionConte
             return null
         }
         val nextLineString = String(nextLineBytes.toByteArray())
-        val requestLine = nextLineString.split(SPACE_CHAR)
+        val requestLine = nextLineString.split(SPACE_CHAR, limit = 3)
         if (requestLine.size != 3) {
             return ParseError
         }

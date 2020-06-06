@@ -12,6 +12,7 @@ class JdkHttpClientAdapter(private val client: java.net.http.HttpClient) : HttpC
         val request = HttpRequest.newBuilder().uri(uri).GET().timeout(timeout).build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         return object : GetResponse {
+            override fun statusCode(): Int = response.statusCode()
             override fun responseUri(): URI = response.uri()
             override fun headers(): Map<String, List<String>> = response.headers().map()
             override fun body(): String? = response.body()
