@@ -177,7 +177,6 @@ void register_message(context *global_context, std::string& message) {
 }
 
 void write_messages(std::vector<message>& messages, std::queue<char>& output_queue) {
-    write_int32(messages.size(), output_queue);
     for (message& current : messages) {
         std::string text = current.text;
         write_int32(text.size(), output_queue);
@@ -233,8 +232,6 @@ void* handle_connection(void *handler_context_pointer) {
     try {
         std::queue<char> input_queue;
         while (!global_context->should_exit) {
-            uint32_t query_type = read_int32(client_socket, input_queue);
-
             if (query_type == request_type::REGISTER_MESSAGE) {
                 uint32_t message_size = read_int32(client_socket, input_queue);
                 std::vector<char> query_bytes = read_bytes(message_size, client_socket, input_queue);
@@ -387,12 +384,8 @@ void write_to_socket(int32_t bytes_to_write, int socket, char *buffer) {
 }
 
 uint32_t convert_to_uint32(std::vector<char>& char_vector) {
-    char bytes[char_vector.size()];
-    for (int i = 0; i < char_vector.size(); ++i) {
-        bytes[i] = char_vector[i];
-    }
     uint32_t result;
-    memcpy(&result, bytes, sizeof(uint32_t));
+    memcpy(&result, char_vector.data(), sizeof(uint32_t));
     return ntohl(result);
 }
 

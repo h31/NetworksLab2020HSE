@@ -102,17 +102,14 @@ void* handle_incoming(void *handler_context_pointer) {
 
     try {
         while (!context->should_exit) {
-            uint32_t message_number = read_int32(context, input_queue);
-            for (uint32_t i = 0; i < message_number; ++i) {
-                uint32_t message_size = read_int32(context, input_queue);
-                std::vector<char> text = read_bytes(message_size, context, input_queue);
-                std::string text_string;
+            uint32_t message_size = read_int32(context, input_queue);
+            std::vector<char> text = read_bytes(message_size, context, input_queue);
+            std::string text_string;
 
-                for (char &c : text) {
-                    text_string += c;
-                }
-                std::cout << text_string << std::endl;
+            for (char &c : text) {
+                text_string += c;
             }
+            std::cout << text_string << std::endl;
         }
     } catch (const std::exception& e) {
         perror(e.what());
@@ -124,7 +121,7 @@ void* handle_incoming(void *handler_context_pointer) {
 
 void write_message(message& message, std::queue<char>& output_queue) {
     std::string text = '<' + std::to_string(message.send_time.tm_hour) + ':' +
-            std::to_string(message.send_time.tm_min) + "> " +
+            std::to_string(message.send_time.tm_min) + " (" + message.send_time.tm_zone + ")> " +
             '[' + message.login + "] " + message.text;
     write_int32(text.size(), output_queue);
     for (char& c : text) {
@@ -216,12 +213,8 @@ void write_to_socket(int32_t bytes_to_write, handler_context *context, char *buf
 }
 
 uint32_t convert_to_uint32(std::vector<char>& char_vector) {
-    char bytes[char_vector.size()];
-    for (int i = 0; i < char_vector.size(); ++i) {
-        bytes[i] = char_vector[i];
-    }
     uint32_t result;
-    memcpy(&result, bytes, sizeof(uint32_t));
+    memcpy(&result, char_vector.data(), sizeof(uint32_t));
     return ntohl(result);
 }
 
