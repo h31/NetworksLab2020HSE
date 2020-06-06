@@ -52,6 +52,9 @@ abstract class HttpMessageParser<T, U : ConnectionContext> {
             }
             is ContentLengthBody -> {
                 val readBytes = context.unparsedBytes.take(body.remainingContentLength)
+                for (i in readBytes.indices) {
+                    context.unparsedBytes.poll()
+                }
                 body.remainingContentLength -= readBytes.size
                 body.bytes.addAll(readBytes)
                 if (body.remainingContentLength == 0) {

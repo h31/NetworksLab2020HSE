@@ -36,11 +36,11 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
             val context = HttpRequestParser.createConnectionContext()
             val inputStream = socket.getInputStream()
             val outputStream = socket.getOutputStream()
-            val byteArray = ByteArray(BUFFER_SIZE)
-            var bytesRead = inputStream.read(byteArray)
+            val inputBuffer = ByteArray(BUFFER_SIZE)
+            var bytesRead = inputStream.read(inputBuffer)
             var finished = false
             while (bytesRead > 0 && !finished) {
-                when (val parseResult = HttpRequestParser.parseMessages(context, byteArray.take(bytesRead))) {
+                when (val parseResult = HttpRequestParser.parseMessages(context, inputBuffer.take(bytesRead))) {
                     EncodingNotImplemented -> {
                         val response = processor.getNotImplementedResponse()
                         outputStream.write(HttpMessageSerializer.serialize(response).toByteArray())
@@ -63,7 +63,7 @@ class HttpServer(port: Int, private val processor: RequestProcessor) {
                     }
                 }
                 if (!finished) {
-                    bytesRead = inputStream.read(byteArray)
+                    bytesRead = inputStream.read(inputBuffer)
                 }
             }
             closeConnection(socket)

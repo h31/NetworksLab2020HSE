@@ -113,15 +113,15 @@ class RequestProcessor : HttpServerEndpointBinder {
 
         private const val HTTP_VERSION = "HTTP/1.1"
 
-        const val GET = "GET"
-        const val POST = "POST"
-        const val HEAD = "HEAD"
+        private const val GET = "GET"
+        private const val POST = "POST"
+        private const val HEAD = "HEAD"
 
-        const val HOST_HEADER = "Host"
-        const val CONNECTION_HEADER = "Connection"
-        const val CONTENT_LENGTH_HEADER = "Content-Length"
-        const val CONTENT_TYPE_HEADER = "Content-Type"
-        const val CONNECTION_CLOSE_VALUE = "close"
+        private const val HOST_HEADER = "Host"
+        private const val CONNECTION_HEADER = "Connection"
+        private const val CONTENT_LENGTH_HEADER = "Content-Length"
+        private const val CONTENT_TYPE_HEADER = "Content-Type"
+        private const val CONNECTION_CLOSE_VALUE = "close"
 
         private fun createBasicResponse(statusCode: Int, reasonPhrase: String) = HttpResponse(
             HTTP_VERSION,

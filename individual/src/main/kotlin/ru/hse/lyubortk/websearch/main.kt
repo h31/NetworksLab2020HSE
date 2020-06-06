@@ -6,6 +6,7 @@ import ru.hse.lyubortk.websearch.core.Searcher
 import ru.hse.lyubortk.websearch.crawler.Crawler
 import ru.hse.lyubortk.websearch.http.adapters.JavalinEndpointBinderAdapter
 import ru.hse.lyubortk.websearch.http.adapters.JdkHttpClientAdapter
+import ru.hse.lyubortk.websearch.http.implementation.HttpClientImpl
 import ru.hse.lyubortk.websearch.http.implementation.HttpServer
 import ru.hse.lyubortk.websearch.http.implementation.RequestProcessor
 import java.net.http.HttpClient
@@ -53,7 +54,7 @@ fun main(args: Array<String>) {
             JdkHttpClientAdapter(jdkClient)
         }
         "custom" -> {
-            TODO()
+            HttpClientImpl(Duration.ofMillis(10_000))
         }
         else -> {
             printUsage()
