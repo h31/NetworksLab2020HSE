@@ -6,14 +6,128 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <time.h>
+
+#include <protocol_utils.h>
+#include <pthread.h>
+
+int pipe_fd[2];
+// pthread_mutex_t pipe_lock;
+
+#define SET_SIZE 256
+
+struct ConnectionsSet_t {
+    pthread_mutex_t lock;
+    uint32_t size;
+    int sockets[SET_SIZE];
+};
+typedef struct ConnectionsSet_t ConnectionsSet;
+
+void init_set(ConnectionsSet *set) {
+    pthread_mutex_init(&set->lock, NULL);
+    set->size = 0;
+    memset(set->sockets, -1, SET_SIZE * sizeof(int));
+}
+
+void add(ConnectionsSet *set, int new_socket) {
+    pthread_mutex_lock(&set->lock);
+    set->sockets[set->size++] = new_socket;
+    pthread_mutex_unlock(&set->lock);
+}
+
+
+void *sending(void* conn_set) {
+    ConnectionsSet *connections = (ConnectionsSet *) conn_set;
+    while (1) {
+        message *msg_ptr = NULL;
+        int nread = 0;
+        nread = read(pipe_fd[0], &msg_ptr, sizeof(message*));
+        if (nread == -1) {
+            continue;
+        }
+        if (msg_ptr == NULL) {
+            break;
+        }
+        
+        IncompliteBuffer iBuffer;
+        clear_buffer(&iBuffer);
+        serialize_msg_to_iBuffer(msg_ptr, &iBuffer);
+
+        pthread_mutex_lock(&connections->lock);
+        int empty_i = -1;
+
+        struct tm *timeinfo = localtime(&msg_ptr->tm);
+        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
+        fflush(stdout);
+        
+        uint32_t len = connections->size;
+        for (uint32_t i = 0; i < len; i++) {
+            if (blocking_send_bytes(connections->sockets[i], &iBuffer) > 0) {
+                if (empty_i != -1) {
+                    connections->sockets[empty_i++] = connections->sockets[i];
+                } 
+            } else {
+                if (empty_i == -1) {
+                    empty_i = i;
+                }
+                --connections->size;
+            }
+        }
+        pthread_mutex_unlock(&connections->lock);
+        free(msg_ptr);
+    }
+    return NULL;
+}
+
+void *connection_handler(void *sct) {
+    int socket = (int) sct;
+
+    int n = 1;
+
+    printf("new connection!\n");
+    fflush(stdout);
+    IncompliteBuffer iBuffer;
+
+    while(1) {
+
+        message *msg_ptr = (message *) calloc(1, sizeof(message));
+        clear_buffer(&iBuffer);
+        n = blocking_read_bytes(socket, &iBuffer);
+
+        if (n == 0) {
+            printf("End of connection\n");
+            write(socket, "lol", 3);
+            break;
+        }
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            exit(1);
+        }
+
+        deserialize_msg_from_iBuffer(msg_ptr, &iBuffer);
+        write(pipe_fd[1], &msg_ptr, sizeof(message *));
+        
+        if (n < 0) {
+            perror("ERROR writing to socket");
+            exit(1);
+        }
+    }
+    shutdown(socket, SHUT_RDWR);
+    return (void *)0;
+}
 
 int main(int argc, char *argv[]) {
+
+    if (pipe(pipe_fd) < 0) {
+        perror("pipe error");
+        exit(1);
+    }
+
     int sockfd, newsockfd;
     uint16_t portno;
     unsigned int clilen;
-    char buffer[256];
     struct sockaddr_in serv_addr, cli_addr;
-    ssize_t n;
 
     if (argc < 2) {
         fprintf(stderr, "usage %s port\n", argv[0]);
@@ -42,31 +156,37 @@ int main(int argc, char *argv[]) {
     }
 
     listen(sockfd, 5);
+    
     clilen = sizeof(cli_addr);
+    
+    
+    ConnectionsSet connections;
+    init_set(&connections);
 
-    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    pthread_t sending_tid;
+    pthread_attr_t sending_attr;
 
-    if (newsockfd < 0) {
-        perror("ERROR on accept");
-        exit(1);
+    pthread_attr_init(&sending_attr);
+
+    pthread_create(&sending_tid, &sending_attr, sending, &connections);
+
+    while(1) {
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        if (newsockfd < 0) {
+            perror("ERROR on accept");
+            exit(1);
+        }
+        
+        add(&connections, newsockfd);
+        pthread_t reader_tid;
+        pthread_attr_t reader_attr;
+
+        pthread_attr_init(&reader_attr);
+
+        pthread_create(&reader_tid, &reader_attr, connection_handler, (void *)newsockfd);
     }
 
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255); // recv on Windows
-
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
-    }
-
-    printf("Here is the message: %s\n", buffer);
-
-    n = write(newsockfd, "I got your message", 18); // send on Windows
-
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
-    }
-
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
     return 0;
 }

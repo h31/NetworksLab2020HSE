@@ -8,13 +8,55 @@
 
 #include <string.h>
 
+#include <protocol_utils.h>
+#include <pthread.h>
+
+void end_of_connection(int socket, int verbose) {
+    shutdown(socket, 2);
+    if (verbose) {
+        printf("Close connection\n");
+    }
+}
+
+int fix_name(char *name) {
+    uint32_t len = strlen(name);
+    if (len > 0 && name[len - 1] == '\n') {
+        name[len - 1] = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+void *socket_reader(void *sct) {
+    int socket = *(int *) sct;
+
+    message msg;
+    IncompliteBuffer iBuffer;
+    while (1) {
+        clear_buffer(&iBuffer);
+        int n = blocking_read_bytes(socket, &iBuffer);
+
+        if (n < 0) {
+            perror("ERROR reading from socket");
+            return (void *)1;
+        }
+
+        if (n == 0) {
+            end_of_connection(socket, 0);
+            return (void *)0;
+        }
+        deserialize_msg_from_iBuffer(&msg, &iBuffer);
+        struct tm *timeinfo = localtime(&msg.tm);
+        printf("<%i:%i> [%s] %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg.name, msg.text);
+    }
+    return (void *)0;
+}
+
 int main(int argc, char *argv[]) {
-    int sockfd, n, err;
+    int sockfd, err;
     //uint16_t portno;
     //struct sockaddr_in serv_addr;
     //struct hostent *server;
-
-    char buffer[256];
 
     if (argc < 3) {
         fprintf(stderr, "usage %s hostname port\n", argv[0]);
@@ -36,8 +78,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    for(struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next)
-    {
+    for (struct addrinfo *addr = addrs; addr != NULL; addr = addr->ai_next) {
         sockfd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
         if (sockfd == -1)
         {
@@ -64,32 +105,48 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    pthread_t tid;
+    pthread_attr_t attr;
 
-    /* Now ask for a message from the user, this message
-       * will be read by server
-    */
+    pthread_attr_init(&attr);
 
-    printf("Please enter the message: ");
-    bzero(buffer, 256);
-    fgets(buffer, 255, stdin);
+    pthread_create(&tid, &attr,socket_reader, &sockfd);
 
-    /* Send message to the server */
-    n = write(sockfd, buffer, strlen(buffer));
+    int code_of_connection = 1;
 
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        exit(1);
+    message msg;
+    printf("Please enter the nickname: ");
+    bzero(msg.name, NAME_SIZE);
+    char* pname = fgets(msg.name, NAME_SIZE, stdin);
+    if (pname == NULL) {
+        code_of_connection = 0;
+    } else { 
+        fix_name(msg.name);
     }
 
-    /* Now read server response */
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, 255);
+    while(code_of_connection > 0) {
+        bzero(msg.text, TEXT_SIZE);
+        char* pnt = fgets(msg.text, TEXT_SIZE, stdin);
 
-    if (n < 0) {
-        perror("ERROR reading from socket");
-        exit(1);
+        if (pnt == NULL) {
+            code_of_connection = 0;
+            break;
+        }
+
+        time ( &msg.tm );
+        
+        IncompliteBuffer iBuffer;
+        clear_buffer(&iBuffer);
+        serialize_msg_to_iBuffer(&msg, &iBuffer);
+
+        code_of_connection = blocking_send_bytes(sockfd, &iBuffer);
+
+        if (code_of_connection < 0) {
+            perror("ERROR writing to socket");
+            break;
+        }
     }
-
-    printf("%s\n", buffer);
+    end_of_connection(sockfd, 1);
+    pthread_join(tid, NULL);
     return 0;
 }
