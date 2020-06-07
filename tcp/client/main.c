@@ -27,14 +27,14 @@ int fix_name(char *name) {
     return 0;
 }
 
-void *reader(void *sct) {
+void *socket_reader(void *sct) {
     int socket = *(int *) sct;
 
     message msg;
     IncompliteBuffer iBuffer;
     while (1) {
         clear_buffer(&iBuffer);
-        int n = read_bytes(socket, &iBuffer);
+        int n = blocking_read_bytes(socket, &iBuffer);
 
         if (n < 0) {
             perror("ERROR reading from socket");
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
 
     pthread_attr_init(&attr);
 
-    pthread_create(&tid, &attr,reader, &sockfd);
+    pthread_create(&tid, &attr,socket_reader, &sockfd);
 
     int code_of_connection = 1;
 
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
         clear_buffer(&iBuffer);
         serialize_msg_to_iBuffer(&msg, &iBuffer);
 
-        code_of_connection = send_bytes(sockfd, &iBuffer);
+        code_of_connection = blocking_send_bytes(sockfd, &iBuffer);
 
         if (code_of_connection < 0) {
             perror("ERROR writing to socket");

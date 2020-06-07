@@ -30,7 +30,7 @@ void clear_buffer(IncompliteBuffer *iBuffer) {
     bzero(iBuffer->buffer, BUFFER_SIZE);
 }
 
-int send_bytes(int socket, const IncompliteBuffer *iBuffer) {
+int send_bytes(int socket, const IncompliteBuffer *iBuffer, int32_t offset) {
     int n = 0;
 
     n = send(socket, &iBuffer->actual_size, HEADER_SIZE, MSG_NOSIGNAL);
@@ -39,8 +39,20 @@ int send_bytes(int socket, const IncompliteBuffer *iBuffer) {
         return n;
     }
 
-    n = send(socket, iBuffer->buffer, iBuffer->actual_size, MSG_NOSIGNAL);
+    n = send(socket, iBuffer->buffer + offset, iBuffer->actual_size - offset, MSG_NOSIGNAL);
     return n;
+}
+
+int blocking_send_bytes(int socket, const IncompliteBuffer *iBuffer) {
+    int32_t i = 0;
+    while (i < iBuffer->actual_size) {
+        int n = send_bytes(socket, iBuffer, i);
+        if (n <= 0) {
+            return n;
+        }
+        i += n;
+    }
+    return i;
 }
 
 int read_bytes(int socket, IncompliteBuffer *iBuffer) {
@@ -54,10 +66,22 @@ int read_bytes(int socket, IncompliteBuffer *iBuffer) {
         iBuffer->actual_size  = 0;
     }
 
-    n = read(socket, iBuffer->buffer, iBuffer->target_size - iBuffer->actual_size);
+    n = read(socket, iBuffer->buffer + iBuffer->actual_size, iBuffer->target_size - iBuffer->actual_size);
     iBuffer->actual_size += n;
     return n;
 }
+
+int blocking_read_bytes(int socket, IncompliteBuffer *iBuffer) {
+    clear_buffer(iBuffer);
+    while (iBuffer->actual_size != iBuffer->target_size) {
+        int n = read_bytes(socket, iBuffer);
+        if (n <= 0) {
+            return n;
+        }
+    }
+    return iBuffer->actual_size;
+}
+
 
 void deserialize_msg(message *msg, const char *buffer, uint32_t len) {
     bzero(msg->text, TEXT_SIZE);

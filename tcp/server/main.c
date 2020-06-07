@@ -62,7 +62,7 @@ void *sending(void* conn_set) {
         
         uint32_t len = connections->size;
         for (uint32_t i = 0; i < len; i++) {
-            if (send_bytes(connections->sockets[i], &iBuffer) > 0) {
+            if (blocking_send_bytes(connections->sockets[i], &iBuffer) > 0) {
                 if (empty_i != -1) {
                     connections->sockets[empty_i++] = connections->sockets[i];
                 } 
@@ -92,7 +92,7 @@ void *connection_handler(void *sct) {
 
         message *msg_ptr = (message *) calloc(1, sizeof(message));
         clear_buffer(&iBuffer);
-        n = read_bytes(socket, &iBuffer);
+        n = blocking_read_bytes(socket, &iBuffer);
 
         if (n == 0) {
             printf("End of connection\n");
@@ -113,7 +113,7 @@ void *connection_handler(void *sct) {
             exit(1);
         }
     }
-    shutdown(socket, 2);
+    shutdown(socket, SHUT_RDWR);
     return (void *)0;
 }
 
