@@ -9,122 +9,165 @@
 #include <time.h>
 
 #include <protocol_utils.h>
-#include <pthread.h>
+
+#include <sys/poll.h>
+#include <fcntl.h>
 
 int pipe_fd[2];
-// pthread_mutex_t pipe_lock;
+
+int setup_pipe() {
+    int rc = pipe(pipe_fd);
+    if (rc < 0) {
+        return rc;
+    }
+    // make read non-block
+    rc = fcntl(pipe_fd[0], F_SETFL, O_NONBLOCK);
+    return rc;
+}
 
 #define SET_SIZE 256
 
 struct ConnectionsSet_t {
-    pthread_mutex_t lock;
-    uint32_t size;
-    int sockets[SET_SIZE];
+    int32_t size;
+    int32_t holes;
+    struct pollfd fds[SET_SIZE];
+    IncompliteBuffer* iBuffers_ptr[SET_SIZE];
 };
 typedef struct ConnectionsSet_t ConnectionsSet;
 
 void init_set(ConnectionsSet *set) {
-    pthread_mutex_init(&set->lock, NULL);
     set->size = 0;
-    memset(set->sockets, -1, SET_SIZE * sizeof(int));
+    set->holes = 0;
+    memset(set->fds, -1, sizeof(set->fds));
 }
 
-void add(ConnectionsSet *set, int new_socket) {
-    pthread_mutex_lock(&set->lock);
-    set->sockets[set->size++] = new_socket;
-    pthread_mutex_unlock(&set->lock);
+void add(ConnectionsSet *set, int new_socket, short flags) {
+    uint32_t n = set->size;
+    set->fds[n].fd = new_socket;
+    set->fds[n].events = flags;
+    set->iBuffers_ptr[n] = malloc(sizeof(IncompliteBuffer));
+    clear_buffer(set->iBuffers_ptr[n]);
+    ++set->size;
 }
 
+void delete(ConnectionsSet *set, int i) {
+    set->fds[i].fd = -1;
+    set->fds[i].events = 0;
+    set->fds[i].revents = 0;
+    free(set->iBuffers_ptr[i]);
+    set->holes += 1;
+}
 
-void *sending(void* conn_set) {
-    ConnectionsSet *connections = (ConnectionsSet *) conn_set;
-    while (1) {
-        message *msg_ptr = NULL;
-        int nread = 0;
-        nread = read(pipe_fd[0], &msg_ptr, sizeof(message*));
-        if (nread == -1) {
-            continue;
-        }
-        if (msg_ptr == NULL) {
-            break;
-        }
-        
-        IncompliteBuffer iBuffer;
-        clear_buffer(&iBuffer);
-        serialize_msg_to_iBuffer(msg_ptr, &iBuffer);
-
-        pthread_mutex_lock(&connections->lock);
+void squizze(ConnectionsSet *set) {
+    if (set->holes > 0) {
         int empty_i = -1;
-
-        struct tm *timeinfo = localtime(&msg_ptr->tm);
-        printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
-        fflush(stdout);
-        
-        uint32_t len = connections->size;
-        for (uint32_t i = 0; i < len; i++) {
-            if (blocking_send_bytes(connections->sockets[i], &iBuffer) > 0) {
+        for (int i = 0; i < set->size; i++) {
+            if (set->fds[i].fd != -1) {
                 if (empty_i != -1) {
-                    connections->sockets[empty_i++] = connections->sockets[i];
-                } 
+                    set->fds[empty_i] = set->fds[i];
+                    set->iBuffers_ptr[empty_i] = set->iBuffers_ptr[i];
+                    ++empty_i;
+                }
             } else {
                 if (empty_i == -1) {
                     empty_i = i;
                 }
-                --connections->size;
             }
         }
-        pthread_mutex_unlock(&connections->lock);
-        free(msg_ptr);
+        set->size -= set->holes;
+        set->holes = 0;
     }
-    return NULL;
 }
 
-void *connection_handler(void *sct) {
-    int socket = (int) sct;
 
-    int n = 1;
-
-    printf("new connection!\n");
-    fflush(stdout);
-    IncompliteBuffer iBuffer;
-
-    while(1) {
-
-        message *msg_ptr = (message *) calloc(1, sizeof(message));
-        clear_buffer(&iBuffer);
-        n = blocking_read_bytes(socket, &iBuffer);
-
-        if (n == 0) {
-            printf("End of connection\n");
-            write(socket, "lol", 3);
-            break;
-        }
-
-        if (n < 0) {
-            perror("ERROR reading from socket");
-            exit(1);
-        }
-
-        deserialize_msg_from_iBuffer(msg_ptr, &iBuffer);
-        write(pipe_fd[1], &msg_ptr, sizeof(message *));
+// void *sending(void* conn_set) {
+//     ConnectionsSet *connections = (ConnectionsSet *) conn_set;
+//     while (1) {
+//         message *msg_ptr = NULL;
+//         int nread = 0;
+//         nread = read(pipe_fd[0], &msg_ptr, sizeof(message*));
+//         if (nread == -1) {
+//             continue;
+//         }
+//         if (msg_ptr == NULL) {
+//             break;
+//         }
         
-        if (n < 0) {
-            perror("ERROR writing to socket");
-            exit(1);
-        }
-    }
-    shutdown(socket, SHUT_RDWR);
-    return (void *)0;
-}
+//         IncompliteBuffer iBuffer;
+//         clear_buffer(&iBuffer);
+//         serialize_msg_to_iBuffer(msg_ptr, &iBuffer);
+
+//         pthread_mutex_lock(&connections->lock);
+//         int empty_i = -1;
+
+//         struct tm *timeinfo = localtime(&msg_ptr->tm);
+//         printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
+//         fflush(stdout);
+        
+//         uint32_t len = connections->size;
+//         for (uint32_t i = 0; i < len; i++) {
+//             if (blocking_send_bytes(connections->sockets[i], &iBuffer) > 0) {
+//                 if (empty_i != -1) {
+//                     connections->sockets[empty_i++] = connections->sockets[i];
+//                 } 
+//             } else {
+//                 if (empty_i == -1) {
+//                     empty_i = i;
+//                 }
+//                 --connections->size;
+//             }
+//         }
+//         pthread_mutex_unlock(&connections->lock);
+//         free(msg_ptr);
+//     }
+//     return NULL;
+// }
+
+// void *connection_handler(void *sct) {
+//     int socket = (int) sct;
+
+//     int n = 1;
+
+//     fflush(stdout);
+//     IncompliteBuffer iBuffer;
+
+//     while(1) {
+
+//         message *msg_ptr = (message *) calloc(1, sizeof(message));
+//         clear_buffer(&iBuffer);
+//         n = blocking_read_bytes(socket, &iBuffer);
+
+//         if (n == 0) {
+//             printf("End of connection\n");
+//             write(socket, "lol", 3);
+//             break;
+//         }
+
+//         if (n < 0) {
+//             perror("ERROR reading from socket");
+//             exit(1);
+//         }
+
+//         deserialize_msg_from_iBuffer(msg_ptr, &iBuffer);
+//         write(pipe_fd[1], &msg_ptr, sizeof(message *));
+        
+//         if (n < 0) {
+//             perror("ERROR writing to socket");
+//             exit(1);
+//         }
+//     }
+//     shutdown(socket, SHUT_RDWR);
+//     return (void *)0;
+// }
 
 int main(int argc, char *argv[]) {
 
-    if (pipe(pipe_fd) < 0) {
+    if (setup_pipe() < 0) {
         perror("pipe error");
         exit(1);
     }
 
-    int sockfd, newsockfd;
+    int sockfd;
     uint16_t portno;
     unsigned int clilen;
     struct sockaddr_in serv_addr, cli_addr;
@@ -138,6 +181,16 @@ int main(int argc, char *argv[]) {
 
     if (sockfd < 0) {
         perror("ERROR opening socket");
+        exit(1);
+    }
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+        perror("ERROR on setsockopt");
+        exit(1);
+    }
+    
+    if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+        perror("ERROR on set socket NONBLOCK");
         exit(1);
     }
 
@@ -162,28 +215,113 @@ int main(int argc, char *argv[]) {
     
     ConnectionsSet connections;
     init_set(&connections);
+    add(&connections, sockfd, POLLIN);
 
-    pthread_t sending_tid;
-    pthread_attr_t sending_attr;
+    // 30 sec
+    int timeout = (30 * 1000);
+    int rc = 0;
+    
+    int server_end = 0;
 
-    pthread_attr_init(&sending_attr);
+    while(!server_end) {
+        rc = poll(connections.fds, connections.size, timeout);
+        if (rc <= 0) {
+            perror("poll() failed");
+            break;
+        }
+        //reading message
+        for (int32_t i = 0; i < connections.size; i++) {
+            if ((connections.fds[i].revents & POLLIN) == 0) {
+                continue;
+            }
+            if (connections.fds[i].fd == sockfd) {
+                // accept
+                while (1) {
+                    int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+                    if (newsockfd < 0) {
+                        if (errno != EWOULDBLOCK) {
+                            perror("ERROR on accept");
+                            exit(1);
+                        }
+                        break;
+                    }
+                    server_end = (newsockfd == 0);
+                    printf("new connection!\n");
+                    add(&connections, newsockfd, POLLIN | POLLOUT);
+                }
+            } else {
+                // users
+                int close_user_connections = 0;
+                IncompliteBuffer *user_iBuffer_ptr = connections.iBuffers_ptr[i];
+                struct pollfd *user_fd_ptr = &connections.fds[i];
+                while(user_iBuffer_ptr->actual_size != user_iBuffer_ptr->target_size) {
+                    rc = read_bytes(user_fd_ptr->fd, user_iBuffer_ptr);
+                    if (rc <= 0) {
+                        if (errno != EWOULDBLOCK) {
+                            if (rc != 0) {
+                                perror("read failed");
+                            }
+                            close_user_connections = 1;
+                        }
+                        break;
+                    }
+                    
+                }
 
-    pthread_create(&sending_tid, &sending_attr, sending, &connections);
+                if (user_iBuffer_ptr->actual_size == user_iBuffer_ptr->target_size) {
+                    message *msg_ptr = (message *) calloc(1, sizeof(message));
+                    deserialize_msg_from_iBuffer(msg_ptr, user_iBuffer_ptr);
 
-    while(1) {
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-        if (newsockfd < 0) {
-            perror("ERROR on accept");
-            exit(1);
+                    struct tm *timeinfo = localtime(&msg_ptr->tm);
+                    printf("<%i:%i> [%s] %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
+
+                    write(pipe_fd[1], &msg_ptr, sizeof(message *));
+                    clear_buffer(user_iBuffer_ptr);
+                }
+
+                if (close_user_connections) {
+                    shutdown(user_fd_ptr->fd, SHUT_RDWR);
+                    delete(&connections, i);
+                }
+            }
         }
         
-        add(&connections, newsockfd);
-        pthread_t reader_tid;
-        pthread_attr_t reader_attr;
+        squizze(&connections);
 
-        pthread_attr_init(&reader_attr);
+        // sending all message in queue
+        while (1) {
+            message *msg_ptr = NULL;
+            rc = read(pipe_fd[0], &msg_ptr, sizeof(message*));
+            if (rc <= 0) {
+                break;
+            }
+            IncompliteBuffer on_send;
+            clear_buffer(&on_send);
+            serialize_msg_to_iBuffer(msg_ptr, &on_send);
 
-        pthread_create(&reader_tid, &reader_attr, connection_handler, (void *)newsockfd);
+            for (int32_t i = 0; i < connections.size; i++) {
+                if ((connections.fds[i].revents & POLLOUT) == 0) {
+                    continue;
+                }
+
+                int close_user_connections = 0;
+
+                struct pollfd *user_fd_ptr = &connections.fds[i];
+                
+                rc = send_bytes(user_fd_ptr->fd, &on_send, 0);
+                if (rc <= 0) {
+                    close_user_connections = 1;
+                }
+
+                if (close_user_connections) {
+                    shutdown(user_fd_ptr->fd, SHUT_RDWR);
+                    delete(&connections, i);
+                }
+            
+            }
+            free(msg_ptr);
+            squizze(&connections);
+        }
     }
 
     close(pipe_fd[0]);
