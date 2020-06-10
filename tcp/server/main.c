@@ -20,8 +20,11 @@ int setup_pipe() {
     if (rc < 0) {
         return rc;
     }
-    // make read non-block
     rc = fcntl(pipe_fd[0], F_SETFL, O_NONBLOCK);
+    if (rc < 0) {
+        return rc;
+    }
+    rc = fcntl(pipe_fd[1], F_SETFL, O_NONBLOCK);
     return rc;
 }
 
@@ -78,87 +81,6 @@ void squizze(ConnectionsSet *set) {
         set->holes = 0;
     }
 }
-
-
-// void *sending(void* conn_set) {
-//     ConnectionsSet *connections = (ConnectionsSet *) conn_set;
-//     while (1) {
-//         message *msg_ptr = NULL;
-//         int nread = 0;
-//         nread = read(pipe_fd[0], &msg_ptr, sizeof(message*));
-//         if (nread == -1) {
-//             continue;
-//         }
-//         if (msg_ptr == NULL) {
-//             break;
-//         }
-        
-//         IncompliteBuffer iBuffer;
-//         clear_buffer(&iBuffer);
-//         serialize_msg_to_iBuffer(msg_ptr, &iBuffer);
-
-//         pthread_mutex_lock(&connections->lock);
-//         int empty_i = -1;
-
-//         struct tm *timeinfo = localtime(&msg_ptr->tm);
-//         printf("<%i:%i> [%s]: %s\n", timeinfo->tm_hour, timeinfo->tm_min, msg_ptr->name, msg_ptr->text);
-//         fflush(stdout);
-        
-//         uint32_t len = connections->size;
-//         for (uint32_t i = 0; i < len; i++) {
-//             if (blocking_send_bytes(connections->sockets[i], &iBuffer) > 0) {
-//                 if (empty_i != -1) {
-//                     connections->sockets[empty_i++] = connections->sockets[i];
-//                 } 
-//             } else {
-//                 if (empty_i == -1) {
-//                     empty_i = i;
-//                 }
-//                 --connections->size;
-//             }
-//         }
-//         pthread_mutex_unlock(&connections->lock);
-//         free(msg_ptr);
-//     }
-//     return NULL;
-// }
-
-// void *connection_handler(void *sct) {
-//     int socket = (int) sct;
-
-//     int n = 1;
-
-//     fflush(stdout);
-//     IncompliteBuffer iBuffer;
-
-//     while(1) {
-
-//         message *msg_ptr = (message *) calloc(1, sizeof(message));
-//         clear_buffer(&iBuffer);
-//         n = blocking_read_bytes(socket, &iBuffer);
-
-//         if (n == 0) {
-//             printf("End of connection\n");
-//             write(socket, "lol", 3);
-//             break;
-//         }
-
-//         if (n < 0) {
-//             perror("ERROR reading from socket");
-//             exit(1);
-//         }
-
-//         deserialize_msg_from_iBuffer(msg_ptr, &iBuffer);
-//         write(pipe_fd[1], &msg_ptr, sizeof(message *));
-        
-//         if (n < 0) {
-//             perror("ERROR writing to socket");
-//             exit(1);
-//         }
-//     }
-//     shutdown(socket, SHUT_RDWR);
-//     return (void *)0;
-// }
 
 int main(int argc, char *argv[]) {
 
