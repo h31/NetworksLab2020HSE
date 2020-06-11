@@ -66,7 +66,7 @@ func (srv *Server) sendPacket(packet Packet, addr *net.UDPAddr) error {
 }
 
 func (srv *Server) readRoutine() {
-
+	
 }
 
 func (srv *Server) writeRoutine() {
