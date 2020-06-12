@@ -65,10 +65,10 @@ void write_number(int socket_fd, T n) {
 
 ChatMessage read_message(int socket_fd) {
     auto time = read_number<int64_t>(socket_fd);
-    auto name_length = read_number<size_t>(socket_fd);
+    auto name_length = read_number<uint64_t>(socket_fd);
     std::vector<char> name(name_length + 1);
     read_n_bytes(socket_fd, name.data(), name_length);
-    auto text_length = read_number<size_t>(socket_fd);
+    auto text_length = read_number<uint64_t>(socket_fd);
     std::vector<char> text(text_length + 1);
     read_n_bytes(socket_fd, text.data(), text_length);
     return {time, std::string(name.data()), std::string(text.data())};
@@ -76,9 +76,9 @@ ChatMessage read_message(int socket_fd) {
 
 void write_message(int socket_fd, const ChatMessage& message) {
     write_number<int64_t>(socket_fd, message.time);
-    write_number<size_t>(socket_fd, message.name.length());
+    write_number<uint64_t>(socket_fd, message.name.length());
     write_n_bytes(socket_fd, message.name.c_str(), message.name.length());
-    write_number<size_t>(socket_fd, message.text.length());
+    write_number<uint64_t>(socket_fd, message.text.length());
     write_n_bytes(socket_fd, message.text.c_str(), message.text.length());
 }
 
