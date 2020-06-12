@@ -63,6 +63,34 @@ func (m Mode) Equals(mode Mode) bool {
 
 type Packet interface {
 	Parse([]byte) error
+	OpCode() OpCode
+}
+
+func Parse(buf []byte) (Packet, error) {
+	op, err := GetOpCode(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	var packet Packet
+	switch *op {
+	case RRQ:
+		err = packet.(ReadRequestPacket).Parse(buf)
+	case WRQ:
+		err = packet.(WriteRequestPacket).Parse(buf)
+	case ACK:
+		err = packet.(AcknowledgementPacket).Parse(buf)
+	case DATA:
+		err = packet.(DataPacket).Parse(buf)
+	case ERROR:
+		err = packet.(ErrorPacket).Parse(buf)
+	}
+
+	if err != nil {
+		return nil, err
+	} else {
+		return packet, nil
+	}
 }
 
 //        2 bytes    string   1 byte     string   1 byte
@@ -80,6 +108,10 @@ type ReadRequestPacket struct {
 
 func (p ReadRequestPacket) Parse(buf []byte) error {
 	return nil
+}
+
+func (p ReadRequestPacket) OpCode() OpCode {
+	return p.Code
 }
 
 func NewReadPacket(filename string, mode Mode) *ReadRequestPacket {
@@ -102,6 +134,10 @@ type WriteRequestPacket struct {
 
 func (p WriteRequestPacket) Parse(buf []byte) error {
 	return nil
+}
+
+func (p WriteRequestPacket) OpCode() OpCode {
+	return p.Code
 }
 
 func NewWritePacket(filename string, mode Mode) *WriteRequestPacket {
@@ -129,6 +165,10 @@ func (p DataPacket) Parse(buf []byte) error {
 	return nil
 }
 
+func (p DataPacket) OpCode() OpCode {
+	return p.Code
+}
+
 func NewDataPacket(block uint16, data []byte) *DataPacket {
 	return &DataPacket{
 		Code: DATA,
@@ -149,6 +189,10 @@ type AcknowledgementPacket struct {
 
 func (p AcknowledgementPacket) Parse(buf []byte) error {
 	return nil
+}
+
+func (p AcknowledgementPacket) OpCode() OpCode {
+	return p.Code
 }
 
 func NewAcknowledgementPacket(block uint16) *AcknowledgementPacket {
@@ -198,6 +242,10 @@ type ErrorPacket struct {
 
 func (p ErrorPacket) Parse(buf []byte) error {
 	return binary.Read(bytes.NewBuffer(buf), binary.BigEndian, p)
+}
+
+func (p ErrorPacket) OpCode() OpCode {
+	return p.Code
 }
 
 func NewErrorPacket(code ErrorCode, msg string) *ErrorPacket {
