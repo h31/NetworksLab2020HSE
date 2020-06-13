@@ -130,9 +130,10 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 	}
 	file, err := os.Create(filename)
 	if err != nil {
-		srv.sendPacket(NewErrorPacket(ErrorAccessViolation, error.Error()), addr)
+		srv.sendPacket(NewErrorPacket(ErrorAccessViolation, err.Error()), addr)
 		return
 	}
+	defer file.Close()
 
 	srv.sendPacket(NewAcknowledgementPacket(0), addr)
 
@@ -174,7 +175,11 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 		}
 
 		//  Write to file
-		file.Write(packet.(DataPacket).Data)
+		_, err = file.Write(packet.(DataPacket).Data)
+		if err != nil {
+			srv.sendPacket(NewErrorPacket(ErrorDiskFill, err.Error()), addr)
+			return
+		}
 
 		// Send ACK
 		block += 1
@@ -187,7 +192,7 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 	}
 }
 
-func init() {
-	srv, _ := NewServer(":69")
+func main() {
+	srv, _ := NewServer(":6969")
 	srv.Serve()
 }
