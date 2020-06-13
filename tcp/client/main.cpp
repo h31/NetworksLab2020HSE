@@ -13,8 +13,8 @@
 #include <queue>
 #include <csignal>
 
-class ReadException : public std::exception {
-};
+class ReadException : public std::exception {};
+class WriteException : public std::exception {};
 
 class Message {
 public:
@@ -166,7 +166,7 @@ void Connection::sendMessage(char * buffer, uint32_t needSend) const {
     while (alreadySend != needSend) {
         int send = write(sockfd, buffer + alreadySend, needSend - alreadySend);
         if (send <= 0) {
-            // Write errors are ignored
+            throw WriteException();
         }
         alreadySend += send;
     }
@@ -267,7 +267,12 @@ int main(int argc, char *argv[]) {
         if (s == "/shutdown") {
             break;
         }
-        connection.sendMessageToChat(s);
+        try {
+            connection.sendMessageToChat(s);
+        } catch (const WriteException &e) {
+            std::cerr << "Server disconnected" << std::endl;
+            break;
+        }
     }
 
     connection.shutdown();
