@@ -21,7 +21,7 @@ class ClientDisconnectedException : public std::exception {};
 class Message {
 public:
     Message(std::string senderName, std::string message, uint16_t time = 0);
-    [[nodiscard]] std::vector<char> toCharArray() const;
+    [[nodiscard]] std::vector<char> toCharArray(uint32_t timeDelta) const;
     void setTime(uint16_t newTime);
 
     uint16_t time;
@@ -73,6 +73,7 @@ private:
     int sockfd;
     Server * server;
     std::string userName;
+    int32_t timeDelta;
     std::atomic_bool isFinished = false;
     uint32_t nextSend = 0;
 
@@ -80,6 +81,7 @@ private:
     std::string getName();
     Message readMessage();
     std::string readString();
+    uint16_t readUInt16();
     uint32_t readUInt32();
     void readSomething();
     void sendMessage(const Message& message) const;
@@ -120,9 +122,17 @@ ClientConnection::~ClientConnection() {
     close(sockfd);
 }
 
+uint16_t getCurrentTime() {
+    std::time_t t = std::time(nullptr);
+    std::tm* now = std::localtime(&t);
+    return now->tm_hour * 60 + now->tm_min;
+}
+
 void ClientConnection::run() {
     try {
         userName = getName();
+        uint16_t userTime = readUInt16();
+        timeDelta = ((int32_t) userTime) - ((int32_t) getCurrentTime());
     } catch (ClientDisconnectedException &e) {
         shutdown();
 
@@ -182,6 +192,20 @@ uint32_t ClientConnection::readUInt32() {
     return ntohl(result);
 }
 
+uint16_t ClientConnection::readUInt16() {
+    while (untreatedInput.size() < sizeof(uint16_t)) {
+        readSomething();
+    }
+    char buffer[sizeof(uint16_t)];
+    for (char& c : buffer) {
+        c = untreatedInput.front();
+        untreatedInput.pop();
+    }
+    uint16_t result;
+    memcpy(&result, buffer, sizeof(uint16_t));
+    return ntohs(result);
+}
+
 void ClientConnection::readSomething() {
     static const uint32_t BUFFER_SIZE = 256;
     char buffer[BUFFER_SIZE];
@@ -198,7 +222,8 @@ Message::Message(std::string senderName, std::string message, uint16_t time) : t
                                                                                senderName(std::move(senderName)),
                                                                                message(std::move(message)) {}
 
-std::vector<char> Message::toCharArray() const {
+std::vector<char> Message::toCharArray(uint32_t timeDelta) const {
+    static const int32_t MINUTES_IN_DAY = 24 * 60;
     uint32_t packageLength = sizeof(uint16_t) +
             sizeof(uint32_t) + message.size() +
             sizeof(uint32_t) + senderName.size();
@@ -207,7 +232,9 @@ std::vector<char> Message::toCharArray() const {
 
     char * dataPointer = buffer;
 
-    uint16_t netTime = htons(time);
+    uint16_t sendTime = (((int32_t) time + timeDelta) % MINUTES_IN_DAY + MINUTES_IN_DAY) % MINUTES_IN_DAY;
+
+    uint16_t netTime = htons(sendTime);
     memcpy(dataPointer, (char *) &netTime, sizeof(uint16_t));
     dataPointer += sizeof(uint16_t);
 
@@ -241,7 +268,7 @@ ClientConnection::ClientConnection(int sockfd, uint32_t clientId, Server * serve
                                                                                      server(server) {}
 
 void ClientConnection::sendMessage(const Message &message) const {
-    std::vector<char> bytes = message.toCharArray();
+    std::vector<char> bytes = message.toCharArray(timeDelta);
     uint32_t needSend = bytes.size();
     uint32_t alreadySent = 0;
     while (alreadySent != needSend) {
@@ -383,12 +410,6 @@ void Server::shutdown() {
     for (ClientConnection * client : clientsCopy) {
         client->shutdown();
     }
-}
-
-uint16_t getCurrentTime() {
-    std::time_t t = std::time(nullptr);
-    std::tm* now = std::localtime(&t);
-    return now->tm_hour * 60 + now->tm_min;
 }
 
 void Server::receiveMessage(const Message &message) {

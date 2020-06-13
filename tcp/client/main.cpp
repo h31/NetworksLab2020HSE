@@ -48,10 +48,18 @@ private:
     uint16_t readUInt16();
     std::string readString();
     void readSomething();
-    void sendMessage(const std::string &message) const;
+    void sendCurrentTime() const;
+    void sendStringMessage(const std::string &message) const;
+    void sendMessage(char * buffer, uint32_t needSend) const;
     explicit Connection(int sockfd);
     static int getSockfd(char * hostname, char * port);
 };
+
+uint16_t getCurrentTime() {
+    std::time_t t = std::time(nullptr);
+    std::tm * now = std::localtime(&t);
+    return now->tm_hour * 60 + now->tm_min;
+}
 
 Connection::~Connection() {
     close(sockfd);
@@ -63,11 +71,12 @@ Connection Connection::buildConnection(char * hostname, char * port) {
 }
 
 void Connection::sendIntroMessage(const std::string &name) {
-    sendMessage(name);
+    sendStringMessage(name);
+    sendCurrentTime();
 }
 
 void Connection::sendMessageToChat(const std::string &message) {
-    sendMessage(message);
+    sendStringMessage(message);
 }
 
 void Connection::shutdown() {
@@ -152,7 +161,25 @@ void Connection::readSomething() {
     }
 }
 
-void Connection::sendMessage(const std::string &message) const {
+void Connection::sendMessage(char * buffer, uint32_t needSend) const {
+    uint32_t alreadySend = 0;
+    while (alreadySend != needSend) {
+        int send = write(sockfd, buffer + alreadySend, needSend - alreadySend);
+        if (send <= 0) {
+            // Write errors are ignored
+        }
+        alreadySend += send;
+    }
+}
+
+void Connection::sendCurrentTime() const {
+    uint16_t netTime = htons(getCurrentTime());
+    char buffer[sizeof(uint16_t)];
+    memcpy(buffer, &netTime, sizeof(uint16_t));
+    sendMessage(buffer, sizeof(uint16_t));
+}
+
+void Connection::sendStringMessage(const std::string &message) const {
     uint32_t length = message.size();
     uint32_t netLength = htonl(length);
 
@@ -161,16 +188,9 @@ void Connection::sendMessage(const std::string &message) const {
     memcpy(buffer, (char *) &netLength, sizeof(uint32_t));
     memcpy(buffer + sizeof(uint32_t), message.c_str(), length);
 
-    uint32_t alreadySend = 0;
     uint32_t needSend = length + sizeof(uint32_t);
 
-    while (alreadySend != needSend) {
-        int send = write(sockfd, buffer + alreadySend, needSend - alreadySend);
-        if (send <= 0) {
-            // Write errors are ignored
-        }
-        alreadySend += send;
-    }
+    sendMessage(buffer, needSend);
 }
 
 Connection::Connection(int sockfd) {
