@@ -7,5 +7,5 @@ object Constants {
     const val RETRANSMISSION_TIMEOUT = 1000
     const val FULL_TIMEOUT = 20000
     const val MAX_RETRIES = 20
-    const val MAX_FILE_SIZE = 512 * (1.shl(16) - 1)
+    const val MAX_FILE_SIZE = DATA_SIZE * (1.shl(16) - 1)
 }
