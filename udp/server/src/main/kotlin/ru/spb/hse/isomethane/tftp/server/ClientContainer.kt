@@ -152,9 +152,7 @@ class ClientContainer(private val rootDirectory: File) {
 
         override fun onCreate(): DatagramPacket {
             finished = true
-            val data = if (file.exists()) {
-                writeTFTP(ErrorMessage(6, "File already exists"))
-            } else try {
+            val data = try {
                 file.createNewFile()
                 finished = false
                 return updatePacket(nextBlock())
