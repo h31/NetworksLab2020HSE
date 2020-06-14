@@ -6,11 +6,11 @@ import (
 )
 
 type Packet interface {
-	Parse([]byte) error
 	OpCode() OpCode
+	Bytes() []byte
 }
 
-func Parse(buf []byte) (Packet, error) {
+func Parse(buf []byte) (*Packet, error) {
 	op, err := GetOpCode(buf)
 	if err != nil {
 		return nil, err
@@ -19,21 +19,21 @@ func Parse(buf []byte) (Packet, error) {
 	var packet Packet
 	switch *op {
 	case RRQ:
-		err = packet.(ReadRequestPacket).Parse(buf)
+		packet, err = ParseReadRequestPacket(buf)
 	case WRQ:
-		err = packet.(WriteRequestPacket).Parse(buf)
+		packet, err = ParseWriteRequestPacket(buf)
 	case ACK:
-		err = packet.(AcknowledgementPacket).Parse(buf)
+		packet, err = ParseAcknowledgementPacket(buf)
 	case DATA:
-		err = packet.(DataPacket).Parse(buf)
+		packet, err = ParseDataPacket(buf)
 	case ERROR:
-		err = packet.(ErrorPacket).Parse(buf)
+		packet, err = ParseErrorPacket(buf)
 	}
 
 	if err != nil {
 		return nil, err
 	} else {
-		return packet, nil
+		return &packet, nil
 	}
 }
 
@@ -50,12 +50,43 @@ type ReadRequestPacket struct {
 	EmptyByte2 int8
 }
 
-func (p ReadRequestPacket) Parse(buf []byte) error {
-	return nil
+func ParseReadRequestPacket(buf []byte) (*ReadRequestPacket, error) {
+	bytesBuffer := bytes.NewBuffer(buf)
+	p := ReadRequestPacket{}
+
+	var op OpCode
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &op); err != nil {
+		return nil, err
+	}
+	p.Code = op
+
+	filenameStr, err := bytesBuffer.ReadString(0x00)
+	if err != nil {
+		return nil, err
+	}
+	p.Filename = filenameStr[:len(filenameStr)-1]
+
+	modeStr, err := bytesBuffer.ReadString(0x00)
+	if err != nil {
+		return nil, err
+	}
+	p.Mode = Mode(modeStr[:len(modeStr)-1])
+
+	return &p, nil
 }
 
 func (p ReadRequestPacket) OpCode() OpCode {
 	return p.Code
+}
+
+func (p ReadRequestPacket) Bytes() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.Code)
+	buf.WriteString(p.Filename)
+	binary.Write(&buf, binary.BigEndian, p.EmptyByte1)
+	buf.WriteString(string(p.Mode))
+	binary.Write(&buf, binary.BigEndian, p.EmptyByte2)
+	return buf.Bytes()
 }
 
 func NewReadPacket(filename string, mode Mode) *ReadRequestPacket {
@@ -76,12 +107,43 @@ type WriteRequestPacket struct {
 	EmptyByte2 int8
 }
 
-func (p WriteRequestPacket) Parse(buf []byte) error {
-	return nil
+func ParseWriteRequestPacket(buf []byte) (*WriteRequestPacket, error) {
+	bytesBuffer := bytes.NewBuffer(buf)
+	p := WriteRequestPacket{}
+
+	var op OpCode
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &op); err != nil {
+		return nil, err
+	}
+	p.Code = op
+
+	filenameStr, err := bytesBuffer.ReadString(0x00)
+	if err != nil {
+		return nil, err
+	}
+	p.Filename = filenameStr[:len(filenameStr)-1]
+
+	modeStr, err := bytesBuffer.ReadString(0x00)
+	if err != nil {
+		return nil, err
+	}
+	p.Mode = Mode(modeStr[:len(modeStr)-1])
+
+	return &p, nil
 }
 
 func (p WriteRequestPacket) OpCode() OpCode {
 	return p.Code
+}
+
+func (p WriteRequestPacket) Bytes() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.Code)
+	buf.WriteString(p.Filename)
+	binary.Write(&buf, binary.BigEndian, p.EmptyByte1)
+	buf.WriteString(string(p.Mode))
+	binary.Write(&buf, binary.BigEndian, p.EmptyByte2)
+	return buf.Bytes()
 }
 
 func NewWritePacket(filename string, mode Mode) *WriteRequestPacket {
@@ -105,12 +167,35 @@ type DataPacket struct {
 	Data  []byte
 }
 
-func (p DataPacket) Parse(buf []byte) error {
-	return nil
+func ParseDataPacket(buf []byte) (*DataPacket, error) {
+	bytesBuffer := bytes.NewBuffer(buf)
+	p := DataPacket{}
+
+	var op OpCode
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &op); err != nil {
+		return nil, err
+	}
+	p.Code = op
+
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &p.Block); err != nil {
+		return nil, err
+	}
+
+	p.Data = bytesBuffer.Bytes()
+
+	return &p, nil
 }
 
 func (p DataPacket) OpCode() OpCode {
 	return p.Code
+}
+
+func (p DataPacket) Bytes() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.Code)
+	binary.Write(&buf, binary.BigEndian, p.Block)
+	buf.Write(p.Data)
+	return buf.Bytes()
 }
 
 func NewDataPacket(block uint16, data []byte) *DataPacket {
@@ -131,12 +216,32 @@ type AcknowledgementPacket struct {
 	Block uint16
 }
 
-func (p AcknowledgementPacket) Parse(buf []byte) error {
-	return nil
+func ParseAcknowledgementPacket(buf []byte) (*AcknowledgementPacket, error) {
+	bytesBuffer := bytes.NewBuffer(buf)
+	p := AcknowledgementPacket{}
+
+	var op OpCode
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &op); err != nil {
+		return nil, err
+	}
+	p.Code = op
+
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &p.Block); err != nil {
+		return nil, err
+	}
+
+	return &p, nil
 }
 
 func (p AcknowledgementPacket) OpCode() OpCode {
 	return p.Code
+}
+
+func (p AcknowledgementPacket) Bytes() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.Code)
+	binary.Write(&buf, binary.BigEndian, p.Block)
+	return buf.Bytes()
 }
 
 func NewAcknowledgementPacket(block uint16) *AcknowledgementPacket {
@@ -158,12 +263,40 @@ type ErrorPacket struct {
 	EmptyByte int8
 }
 
-func (p ErrorPacket) Parse(buf []byte) error {
-	return binary.Read(bytes.NewBuffer(buf), binary.BigEndian, p)
+func ParseErrorPacket(buf []byte) (*ErrorPacket, error) {
+	bytesBuffer := bytes.NewBuffer(buf)
+	p := ErrorPacket{}
+
+	var op OpCode
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &op); err != nil {
+		return nil, err
+	}
+	p.Code = op
+
+	if err := binary.Read(bytesBuffer, binary.BigEndian, &p.Error); err != nil {
+		return nil, err
+	}
+
+	errStr, err := bytesBuffer.ReadString(0x00)
+	if err != nil {
+		return nil, err
+	}
+	p.Message = errStr[:len(errStr)-1]
+
+	return &p, nil
 }
 
 func (p ErrorPacket) OpCode() OpCode {
 	return p.Code
+}
+
+func (p ErrorPacket) Bytes() []byte {
+	var buf bytes.Buffer
+	binary.Write(&buf, binary.BigEndian, p.Code)
+	binary.Write(&buf, binary.BigEndian, p.Error)
+	buf.WriteString(p.Message)
+	binary.Write(&buf, binary.BigEndian, p.EmptyByte)
+	return buf.Bytes()
 }
 
 func NewErrorPacket(code ErrorCode, msg string) *ErrorPacket {

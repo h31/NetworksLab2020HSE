@@ -27,7 +27,7 @@ const (
 
 func GetOpCode(buf []byte) (*OpCode, error)  {
 	var op OpCode
-	if err := binary.Read( bytes.NewBuffer(buf), binary.BigEndian, &op); err != nil {
+	if err := binary.Read(bytes.NewBuffer(buf), binary.BigEndian, &op); err != nil {
 		return nil, err
 	}
 	switch op {
@@ -45,3 +45,4 @@ func GetOpCode(buf []byte) (*OpCode, error)  {
 		return nil, errors.New("Unknown operation code")
 	}
 }
+

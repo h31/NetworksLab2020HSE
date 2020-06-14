@@ -13,7 +13,7 @@ package tftp
 // 6        File already exists.
 // 7        No such user.
 
-type ErrorCode int
+type ErrorCode uint16
 
 const (
 	ErrorNotDefined        ErrorCode = 0

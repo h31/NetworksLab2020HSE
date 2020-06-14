@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
+	"../tftp"
+	"fmt"
 	"math"
 	"net"
 	"os"
 	"time"
-	"./tftp"
 )
 
 type Server struct {
@@ -34,25 +33,26 @@ func (srv *Server) Serve() error {
 		if err != nil {
 			return err
 		}
-		if addr != srv.addr {
-			go srv.sendPacket(*tftp.NewErrorPacket(tftp.ErrorUnknownTid, ""), addr)
-		}
 
 		_, err = tftp.GetOpCode(buf)
 		if err != nil {
 			srv.sendPacket(*tftp.NewErrorPacket(tftp.ErrorIllegalOperation, ""), addr)
+			continue
 		}
 		packet, err := tftp.Parse(buf)
 		if err != nil {
 			srv.sendPacket(*tftp.NewErrorPacket(tftp.ErrorNotDefined, err.Error()), addr)
+			continue
 		}
 
-		switch packet.OpCode() {
+		fmt.Println("WOW")
+		switch (*packet).OpCode() {
 		case tftp.RRQ:
-			//srv.sendPacket(*NewAcknowledgementPacket(0), addr)
-			go srv.readRoutine(packet.(tftp.ReadRequestPacket).Filename, addr)
+			//go srv.readRoutine((*packet).(*tftp.ReadRequestPacket).Filename, addr)
+			srv.readRoutine((*packet).(*tftp.ReadRequestPacket).Filename, addr)
 		case tftp.WRQ:
-			go srv.writeRoutine(packet.(tftp.WriteRequestPacket).Filename, addr)
+			//go srv.writeRoutine((*packet).(*tftp.WriteRequestPacket).Filename, addr)
+			srv.writeRoutine((*packet).(*tftp.WriteRequestPacket).Filename, addr)
 		default:
 			srv.sendPacket(*tftp.NewErrorPacket(tftp.ErrorIllegalOperation, ""), addr)
 		}
@@ -62,10 +62,7 @@ func (srv *Server) Serve() error {
 }
 
 func (srv *Server) sendPacket(packet tftp.Packet, addr *net.UDPAddr) error {
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.BigEndian, packet)
-
-	if _, err := srv.conn.WriteToUDP(buf.Bytes(), addr); err != nil {
+	if _, err := srv.conn.WriteToUDP(packet.Bytes(), addr); err != nil {
 		return err
 	}
 	return nil
@@ -99,7 +96,7 @@ func (srv *Server) readRoutine(filename string, addr *net.UDPAddr) {
 			if err != nil {
 				return
 			}
-			if addrGot != nil {
+			if addrGot.String() != addr.String() {
 				srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorUnknownTid, ""), addrGot)
 				continue
 			}
@@ -114,21 +111,24 @@ func (srv *Server) readRoutine(filename string, addr *net.UDPAddr) {
 				continue
 			}
 			packet, err := tftp.Parse(got)
-			if packet.(tftp.AcknowledgementPacket).Block != block {
+			if (*packet).(*tftp.AcknowledgementPacket).Block != block {
 				continue
 			}
 
+			break
+		}
+		if end == n {
 			break
 		}
 	}
 }
 
 func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
-	_, err := os.Open(filename)
-	if err == nil {
-		srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorFileAlreadyExists, ""), addr)
-		return
-	}
+	//_, err := os.Open(filename)
+	//if err == nil {
+	//	srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorFileAlreadyExists, ""), addr)
+	//	return
+	//}
 	file, err := os.Create(filename)
 	if err != nil {
 		srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorAccessViolation, err.Error()), addr)
@@ -145,7 +145,7 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 		if err != nil {
 			return
 		}
-		if addrGot != addr {
+		if addrGot.String() != addr.String() {
 			srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorUnknownTid, ""), addrGot)
 			continue
 		}
@@ -166,17 +166,18 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 			srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorNotDefined, ""), addr)
 			continue
 		}
-		if packet.(tftp.DataPacket).Block > block + 1 {
+		if (*packet).(*tftp.DataPacket).Block > block + 1 {
 			srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorNotDefined, ""), addr)
 			continue
 		}
-		if packet.(tftp.DataPacket).Block < block {
-			srv.sendPacket(tftp.NewAcknowledgementPacket(packet.(tftp.DataPacket).Block), addr)
+		if (*packet).(*tftp.DataPacket).Block < block {
+			srv.sendPacket(tftp.NewAcknowledgementPacket((*packet).(*tftp.DataPacket).Block), addr)
 			continue
 		}
 
 		//  Write to file
-		_, err = file.Write(packet.(tftp.DataPacket).Data)
+		fmt.Println((*packet).(*tftp.DataPacket).Data)
+		_, err = file.Write((*packet).(*tftp.DataPacket).Data)
 		if err != nil {
 			srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorDiskFill, err.Error()), addr)
 			return
@@ -187,7 +188,7 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 		srv.sendPacket(tftp.NewAcknowledgementPacket(block), addr)
 
 		// finish conn
-		if len(packet.(tftp.DataPacket).Data) < 512 {
+		if len((*packet).(*tftp.DataPacket).Data) < 512 {
 			break
 		}
 	}
