@@ -3,6 +3,7 @@ package main
 import (
 	"../tftp"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net"
 	"os"
@@ -76,19 +77,19 @@ func (srv *Server) readRoutine(filename string, addr *net.UDPAddr) {
 	}
 	defer file.Close()
 
-	var buf []byte
-	n, err := file.Read(buf)
+	buf, err := ioutil.ReadFile(filename)
 	if err != nil {
 		srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorAccessViolation, err.Error()), addr)
 	}
 
 	var block uint16 = 0
+	finish := len(buf)
 	for {
-		start := block * 512
+		first := block * 512
 		block += 1
-		end := int(math.Min(float64(block * 512), float64(n)))
+		last := int(math.Min(float64(block * 512), float64(finish)))
 		for {
-			srv.sendPacket(tftp.NewDataPacket(block, buf[start:end]), addr)
+			srv.sendPacket(tftp.NewDataPacket(block, buf[first:last]), addr)
 			time.Sleep(time.Second)
 
 			got := make([]byte, 1000)
@@ -117,7 +118,7 @@ func (srv *Server) readRoutine(filename string, addr *net.UDPAddr) {
 
 			break
 		}
-		if end == n {
+		if last == finish {
 			break
 		}
 	}
@@ -176,7 +177,7 @@ func (srv *Server) writeRoutine(filename string, addr *net.UDPAddr) {
 		}
 
 		//  Write to file
-		fmt.Println((*packet).(*tftp.DataPacket).Data)
+		//fmt.Println((*packet).(*tftp.DataPacket).Data)
 		_, err = file.Write((*packet).(*tftp.DataPacket).Data)
 		if err != nil {
 			srv.sendPacket(tftp.NewErrorPacket(tftp.ErrorDiskFill, err.Error()), addr)

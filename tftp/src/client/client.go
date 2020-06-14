@@ -3,10 +3,10 @@ package main
 import (
 	"../tftp"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
+	"os"
 	"time"
 )
 
@@ -34,6 +34,12 @@ func NewClient(addr, hostAddr string) (*Client, error) {
 }
 
 func (c *Client) Read(filename string, mode tftp.Mode) {
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
 	initPacket := tftp.NewReadPacket(filename, mode)
 	c.sendPacket(initPacket, c.host)
 
@@ -68,10 +74,16 @@ func (c *Client) Read(filename string, mode tftp.Mode) {
 		}
 
 		//save read data
-		fmt.Println(string(got))
+		fmt.Println((*packet).(*tftp.DataPacket).Data)
+		file.Write((*packet).(*tftp.DataPacket).Data)
 
+		block += 1
 		//send ACk
 		c.sendPacket(tftp.NewAcknowledgementPacket(block), c.host)
+
+		if len((*packet).(*tftp.DataPacket).Data) < 512 {
+			break
+		}
 	}
 }
 
@@ -170,12 +182,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//file, _ := os.Open("test.txt")
-	//var buf []byte
-	//file.Read(buf)
-	buf, err := ioutil.ReadFile("test.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	cl.Write(buf, "test.txt", tftp.NETASCII)
+	// Тестируем запись
+	//buf, err := ioutil.ReadFile("test.txt")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//cl.Write(buf, "test.txt", tftp.NETASCII)
+
+
+	// Тестируем чтение
+	cl.Read("test.txt", tftp.NETASCII)
 }
