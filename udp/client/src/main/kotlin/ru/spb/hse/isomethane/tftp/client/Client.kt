@@ -14,20 +14,23 @@ class TFTPException(message: String) : Exception(message)
 class Client {
     private val socket = DatagramSocket()
     var mode = "octet"
+    var host: InetAddress = InetAddress.getLocalHost()
+    var port = 69
 
     init {
         socket.soTimeout = Constants.RETRANSMISSION_TIMEOUT
     }
 
     fun connect(host: InetAddress, port: Int? = null) {
-        socket.connect(host, port ?: 69)
+        this.host = host
+        this.port = port ?: 69
     }
 
     fun get(fromFile: String, toFile: String? = null) {
         val output = ByteArrayOutputStream()
 
         val request = writeTFTP(ReadRequest(fromFile, mode))
-        val requestPacket = DatagramPacket(request, request.size, socket.remoteSocketAddress)
+        val requestPacket = DatagramPacket(request, request.size, host, port)
         socket.send(requestPacket)
 
         var block = 1
@@ -52,7 +55,7 @@ class Client {
                     if (response.block == block) {
                         output.write(response.data)
                         val ack = writeTFTP(Acknowledgement(block++))
-                        lastPacket = DatagramPacket(ack, ack.size, socket.remoteSocketAddress)
+                        lastPacket = DatagramPacket(ack, ack.size, packet.socketAddress)
                         socket.send(lastPacket)
                         if (response.data.size < Constants.DATA_SIZE) {
                             writeFile(toFile ?: fromFile, output.toByteArray())
@@ -71,7 +74,7 @@ class Client {
         val input = initInput(fromFile)
 
         val request = writeTFTP(WriteRequest(toFile ?: fromFile, mode))
-        val requestPacket = DatagramPacket(request, request.size, socket.remoteSocketAddress)
+        val requestPacket = DatagramPacket(request, request.size, host, port)
         socket.send(requestPacket)
 
         var block = 0
@@ -103,7 +106,7 @@ class Client {
                             lastBlock = true
                         }
                         val data = writeTFTP(Data(++block, blockData))
-                        lastPacket = DatagramPacket(data, data.size, socket.remoteSocketAddress)
+                        lastPacket = DatagramPacket(data, data.size, packet.socketAddress)
                         socket.send(lastPacket)
                     }
                 }
@@ -133,7 +136,6 @@ class Client {
             }
             writer.close()
         } else {
-            println(data.size)
             file.writeBytes(data)
         }
     }
