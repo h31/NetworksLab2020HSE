@@ -71,9 +71,7 @@ class WriteHandler(Thread):
                 cur_block_num += 1
 
                 raw_ans = local_socket.recv(tftpServer.MAX_SIZE)
-                print(raw_ans)
                 ans = deserialize_msg(raw_ans)
-                # print(ans.block_num, cur_block_num)
                 if type(ans) is not Data or ans.block_num != cur_block_num:
                     raise Exception("unexpected answer", ans)
 
@@ -104,15 +102,14 @@ class tftpServer:
             print("wait new request")
             raw_request, addr = self.socket.recvfrom(self.MAX_SIZE)
             request = deserialize_msg(raw_request)
+            print("got %s" % request)
             if not issubclass(type(request), Request):
                 print("Illegal TFTP operation from %s" % addr)
                 self.socket.sendto(Error(4, "Illegal TFTP operation").serialize(), addr)
                 continue
             if issubclass(type(request), ReadRequest):
-                print("start read")
                 ReadHandler(request, addr).start()
             else:
-                print("start write")
                 WriteHandler(request, addr).start()
 
 
