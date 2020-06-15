@@ -74,7 +74,7 @@ class Acknowledgment(tftpMassage):
 
 class Error(tftpMassage):
     def __init__(self, err_num, err_msg):
-        super().__init__(4)
+        super().__init__(5)
         self.err_msg = err_msg
         self.err_num = err_num
 
@@ -95,7 +95,7 @@ def deserialize_msg(msg_bytes):
         strings = msg_bytes[2:].split(b'\0', 2)
         file_name = strings[0].decode("ascii")
         mode = strings[1].decode("ascii")
-        if mode != Request.NETASCII_MODE or mode != Request.OCTET_MODE:
+        if mode != Request.NETASCII_MODE and mode != Request.OCTET_MODE:
             raise Exception("unknown request mode", mode)
         if opcode == 1:
             return ReadRequest(file_name, mode)

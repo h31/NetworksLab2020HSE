@@ -48,9 +48,11 @@ class tftpClient:
         cur_block_num = 1
         while True:
             data = src_file.read(512)
-            data = data.encode("ascii")
-            print(len(data))
-            print(Data(cur_block_num, data).serialize())
+            if mode == Request.NETASCII_MODE:
+                data = data.encode("ascii")
+
+            # print(len(data))
+            # print(Data(cur_block_num, data).serialize())
             self.socket.sendto(Data(cur_block_num, data).serialize(), addr)
 
             raw_ans, addr = self.socket.recvfrom(self.MAX_SIZE)
@@ -65,7 +67,7 @@ class tftpClient:
 
 if __name__ == '__main__':
     if len(sys.argv) != 6:
-        print("usage: python main.py host [GET|PUT] [octet|netascii] remote_file local_file")
+        print("usage: python client.py host [GET|PUT] [octet|netascii] remote_file local_file")
         exit(1)
 
     host = sys.argv[1]
